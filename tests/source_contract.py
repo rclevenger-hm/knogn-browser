@@ -12,6 +12,7 @@ checks = {
     "Qt 6.11 floor": "find_package(Qt6 6.11 REQUIRED" in cmake,
     "MV3 extension install": "installExtension(path)" in profile,
     "private profiles": "new QWebEngineProfile(this)" in profile,
+    "back-forward cache": "BackForwardCacheEnabled, true" in profile,
     "background lifecycle optimization": "recommendedState()" in window,
     "private CLI mode": "privateOption" in main,
 }
