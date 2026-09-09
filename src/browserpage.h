@@ -14,7 +14,14 @@ public:
 
 protected:
     QWebEnginePage *createWindow(WebWindowType type) override;
+    bool acceptNavigationRequest(const QUrl &url,
+                                 NavigationType type,
+                                 bool isMainFrame) override;
 
 private:
+    void setFullScreenMode(bool enabled);
+
     NewPageFactory newPageFactory_;
+    Qt::WindowStates previousWindowState_ = Qt::WindowNoState;
+    bool fullScreenActive_ = false;
 };
