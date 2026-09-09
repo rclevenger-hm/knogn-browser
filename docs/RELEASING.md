@@ -16,20 +16,20 @@ For version `0.1.0`, the release asset names are:
 
 Each platform also has a versioned SHA-256 manifest, for example `SHA256SUMS-Knogn-0.1.0-windows-x86_64.txt`.
 
-The version comes from `project(KnognBrowser VERSION ...)` in `CMakeLists.txt`. A release tag must match that version exactly. For example, application version `0.1.0` must be released with tag `v0.1.0`; a mismatched tag fails before publishing anything.
+The version comes from `project(KnognBrowser VERSION ...)` in `CMakeLists.txt`. Explicit release tags must match that version exactly. For example, application version `0.1.0` can only be tagged `v0.1.0`; a mismatched tag fails before publishing anything.
 
 ## Pipeline
 
 `.github/workflows/package.yml` runs on:
 
 - pull requests targeting `main` so packaging changes are tested before merge;
-- pushes to `main` so the current branch always has downloadable build artifacts;
+- pushes to `main`;
 - version tags matching `v*`;
 - manual `workflow_dispatch` runs.
 
 The workflow performs these steps on every platform:
 
-1. resolve the application version from `CMakeLists.txt` and verify a release tag matches it;
+1. resolve the application version from `CMakeLists.txt` and verify an explicit release tag matches it;
 2. install the pinned Qt 6.11.2 WebEngine toolchain;
 3. configure and compile Knogn in Release mode;
 4. let `qt_generate_deploy_app_script()` collect the Qt libraries, plugins, WebEngine process, resources and other runtime dependencies;
@@ -41,18 +41,32 @@ The workflow performs these steps on every platform:
 
 Linux packages omit Qt translations, strip deployable binaries, and use xz compression to keep the WebEngine distribution substantially smaller without dropping required runtime content.
 
-For version tags, the three artifact sets are downloaded into a release job. The release job verifies that all six expected OS files and all three checksum manifests exist before it creates or updates the matching GitHub Release.
+After a successful `main` packaging run, the release job checks whether `v<application-version>` already has a published GitHub Release:
+
+- if the version has never been released, the workflow creates the version tag at that exact `main` commit and publishes all Windows, Linux, and macOS assets;
+- if that version is already published, the release is left unchanged so published versions remain immutable;
+- an explicit matching `v*` tag is still supported and follows the same complete asset-matrix validation.
+
+Before publishing, the release job verifies that all six expected OS files and all three checksum manifests exist.
 
 ## Version release
 
-Prepare and merge the desired source state, update the project version in `CMakeLists.txt`, then create the matching version tag. For example:
+To publish a new Knogn version, update the project version in `CMakeLists.txt` as part of the release change and merge it to `main`. For example:
 
-```bash
-git tag v0.1.0
-git push origin v0.1.0
+```cmake
+project(KnognBrowser VERSION 0.2.0 LANGUAGES CXX)
 ```
 
-The tag starts the packaging matrix and, if all packaging jobs succeed, the release job publishes the Windows, Linux and macOS variants together under **Knogn 0.1.0**.
+Once the `main` packaging matrix succeeds, GitHub Actions automatically creates `v0.2.0` and the **Knogn 0.2.0** release with the complete Windows, Linux, and macOS distribution set.
+
+You may also create the matching version tag manually if needed:
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+The important rule is that the source version, tag, filenames, checksums, and GitHub Release version must all agree.
 
 ## Signing status
 
