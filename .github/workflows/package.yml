@@ -140,6 +140,18 @@ jobs:
           output.write_text('\n'.join(lines) + '\n', encoding='utf-8')
           PY
 
+      - name: Remove CPack staging directory
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import shutil
+
+          staging = Path('dist/_CPack_Packages')
+          if staging.exists():
+              shutil.rmtree(staging)
+          PY
+
       - name: Upload installer artifacts
         uses: actions/upload-artifact@v4
         with:
