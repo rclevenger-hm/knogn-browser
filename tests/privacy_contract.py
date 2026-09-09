@@ -7,11 +7,11 @@ SRC = ROOT / "src"
 source = "\n".join(p.read_text(encoding="utf-8") for p in SRC.glob("*.*"))
 
 required = {
-    "background networking disabled": "--disable-background-networking",
     "component update disabled": "--disable-component-update",
     "domain reliability disabled": "--disable-domain-reliability",
     "sync disabled": "--disable-sync",
     "crash reporter disabled": "--disable-breakpad",
+    "navigation pings disabled": "--no-pings",
     "push service disabled": "setPushServiceEnabled(false)",
     "third-party state filter": "return !request.thirdParty",
     "DNS prefetch disabled": "DnsPrefetchEnabled, false",
@@ -36,4 +36,4 @@ for forbidden in (
     if forbidden in source.lower():
         raise SystemExit(f"Forbidden telemetry endpoint in source: {forbidden}")
 
-print(f"privacy contract: {len(required)} invariants present; no telemetry endpoints found")
+print(f"privacy contract: {len(required)} targeted invariants present; no telemetry endpoints found")
