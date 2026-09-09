@@ -41,6 +41,7 @@ void PrivacyProfile::configureProfile() {
         });
 
     auto *settings = profile_->settings();
+    settings->setAttribute(QWebEngineSettings::BackForwardCacheEnabled, true);
     settings->setAttribute(QWebEngineSettings::DnsPrefetchEnabled, false);
     settings->setAttribute(QWebEngineSettings::HyperlinkAuditingEnabled, false);
     settings->setAttribute(QWebEngineSettings::WebRTCPublicInterfacesOnly, true);
