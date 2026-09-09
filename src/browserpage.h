@@ -24,4 +24,5 @@ private:
     NewPageFactory newPageFactory_;
     Qt::WindowStates previousWindowState_ = Qt::WindowNoState;
     bool fullScreenActive_ = false;
+    bool newTabBrandingShown_ = false;
 };
