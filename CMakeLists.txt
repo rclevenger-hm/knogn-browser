@@ -69,6 +69,7 @@ qt_generate_deploy_app_script(
     TARGET knogn-browser
     OUTPUT_SCRIPT knogn_deploy_script
     NO_UNSUPPORTED_PLATFORM_ERROR
+    NO_TRANSLATIONS
 )
 install(SCRIPT ${knogn_deploy_script})
 
@@ -89,10 +90,12 @@ if(WIN32)
 elseif(APPLE)
     set(CPACK_GENERATOR "DragNDrop;ZIP")
 elseif(UNIX)
-    set(CPACK_GENERATOR "DEB;TGZ")
+    set(CPACK_GENERATOR "DEB;TXZ")
     set(CPACK_PACKAGING_INSTALL_PREFIX "/opt/knogn")
+    set(CPACK_STRIP_FILES TRUE)
     set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Roger Clevenger")
     set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+    set(CPACK_DEBIAN_COMPRESSION_TYPE "xz")
     set(CPACK_DEBIAN_PACKAGE_SECTION "web")
     set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
     set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6, libstdc++6")
