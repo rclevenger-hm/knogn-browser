@@ -1,5 +1,6 @@
 #include "browserpage.h"
 
+#include "branding.h"
 #include "mediadetails.h"
 
 #include <QMenuBar>
@@ -57,6 +58,15 @@ bool BrowserPage::acceptNavigationRequest(const QUrl &url,
         url.host() == QStringLiteral("media")) {
         QTimer::singleShot(0, this, [this] {
             setHtml(mediaDiagnosticsHtml(), QUrl(QStringLiteral("knogn://media")));
+        });
+        return false;
+    }
+
+    if (isMainFrame && url == QUrl(QStringLiteral("about:blank")) &&
+        !newTabBrandingShown_) {
+        newTabBrandingShown_ = true;
+        QTimer::singleShot(0, this, [this] {
+            setHtml(Branding::newTabHtml(), QUrl(QStringLiteral("about:blank")));
         });
         return false;
     }
