@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(KnognBrowser VERSION 0.1.3 LANGUAGES CXX)
+project(KnognBrowser VERSION 0.2.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -8,12 +8,34 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
 include(GNUInstallDirs)
+include(FetchContent)
 
 find_package(Qt6 6.11 REQUIRED COMPONENTS Widgets WebEngineWidgets WebEngineCore)
 qt_standard_project_setup()
 
+# Passwords must use a platform secure store. Build QtKeychain statically so the
+# release packages do not gain an extra runtime library while preserving native
+# Windows Credential Store / macOS Keychain / Linux keyring backends.
+set(BUILD_TRANSLATIONS OFF CACHE BOOL "" FORCE)
+set(BUILD_TEST_APPLICATION OFF CACHE BOOL "" FORCE)
+set(BUILD_QTQUICK_DEMO OFF CACHE BOOL "" FORCE)
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(LIBSECRET_SUPPORT OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+    qtkeychain
+    GIT_REPOSITORY https://github.com/frankosterfeld/qtkeychain.git
+    GIT_TAG 0.17.0
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(qtkeychain)
+
 qt_add_executable(knogn-browser
     src/main.cpp
+    src/appsettings.cpp
+    src/appsettings.h
+    src/bookmarks.cpp
+    src/bookmarks.h
     src/branding.cpp
     src/branding.h
     src/browserflags.cpp
@@ -22,18 +44,23 @@ qt_add_executable(knogn-browser
     src/browserpage.h
     src/browserwindow.cpp
     src/browserwindow.h
+    src/credentialstore.cpp
+    src/credentialstore.h
     src/mediadetails.cpp
     src/mediadetails.h
     src/privacyinterceptor.cpp
     src/privacyinterceptor.h
     src/privacyprofile.cpp
     src/privacyprofile.h
+    src/settingsdialog.cpp
+    src/settingsdialog.h
 )
 
 target_link_libraries(knogn-browser PRIVATE
     Qt6::Widgets
     Qt6::WebEngineWidgets
     Qt6::WebEngineCore
+    qt6keychain
 )
 
 target_compile_definitions(knogn-browser PRIVATE
@@ -51,6 +78,13 @@ else()
 endif()
 
 if(WIN32)
+    set(KNOGN_ICON_PATH "${CMAKE_CURRENT_SOURCE_DIR}/assets/knogn.ico")
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows/knogn.rc.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/knogn.rc"
+        @ONLY
+    )
+    target_sources(knogn-browser PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/knogn.rc")
     set_target_properties(knogn-browser PROPERTIES WIN32_EXECUTABLE TRUE)
 endif()
 
@@ -90,7 +124,12 @@ if(WIN32)
     set(CPACK_NSIS_DISPLAY_NAME "Knogn")
     set(CPACK_NSIS_PACKAGE_NAME "Knogn")
     set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
+    set(CPACK_NSIS_MUI_ICON "${CMAKE_CURRENT_SOURCE_DIR}/assets/knogn.ico")
+    set(CPACK_NSIS_MUI_UNIICON "${CMAKE_CURRENT_SOURCE_DIR}/assets/knogn.ico")
+    set(CPACK_NSIS_EXECUTABLES_DIRECTORY "bin")
+    set(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\\\Knogn.exe")
     set(CPACK_PACKAGE_EXECUTABLES "Knogn" "Knogn")
+    set(CPACK_CREATE_DESKTOP_LINKS "Knogn")
 elseif(APPLE)
     set(CPACK_GENERATOR "DragNDrop;ZIP")
 elseif(UNIX)

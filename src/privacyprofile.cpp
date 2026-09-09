@@ -1,5 +1,6 @@
 #include "privacyprofile.h"
 
+#include "appsettings.h"
 #include "privacyinterceptor.h"
 
 #include <QTimer>
@@ -12,8 +13,6 @@
 PrivacyProfile::PrivacyProfile(bool privateMode, QObject *parent)
     : QObject(parent), privateMode_(privateMode) {
     if (privateMode_) {
-        // A profile without a storage name is off-the-record. Qt keeps cookies,
-        // HTTP cache and normally persistent web data in memory for this profile.
         profile_ = new QWebEngineProfile(this);
     } else {
         profile_ = new QWebEngineProfile(QStringLiteral("knogn-default"), this);
@@ -28,23 +27,20 @@ PrivacyProfile::PrivacyProfile(bool privateMode, QObject *parent)
 
 void PrivacyProfile::configureProfile() {
     profile_->setPushServiceEnabled(false);
-    profile_->setSpellCheckEnabled(true);
+    profile_->setSpellCheckEnabled(AppSettings::spellCheckEnabled());
 
     interceptor_ = new PrivacyInterceptor(this);
     profile_->setUrlRequestInterceptor(interceptor_);
 
-    // Qt documents that this filter gates cookies and other stateful tracking
-    // surfaces including IndexedDB, DOM storage, filesystem APIs and service workers.
+    const bool blockThirdParty = AppSettings::blockThirdPartyState();
     profile_->cookieStore()->setCookieFilter(
-        [](const QWebEngineCookieStore::FilterRequest &request) {
-            return !request.thirdParty;
+        [blockThirdParty](const QWebEngineCookieStore::FilterRequest &request) {
+            return !blockThirdParty || !request.thirdParty;
         });
 
     auto *settings = profile_->settings();
     settings->setAttribute(QWebEngineSettings::BackForwardCacheEnabled, true);
     settings->setAttribute(QWebEngineSettings::FullScreenSupportEnabled, true);
-    // Match desktop-browser media semantics rather than the more restrictive
-    // mobile-style gesture gate. Sites can still be muted/stopped by the user.
     settings->setAttribute(QWebEngineSettings::PlaybackRequiresUserGesture, false);
     settings->setAttribute(QWebEngineSettings::WebGLEnabled, true);
     settings->setAttribute(QWebEngineSettings::Accelerated2dCanvasEnabled, true);
@@ -82,8 +78,6 @@ void PrivacyProfile::configureExtensions() {
         emit extensionInstalled(extension.name());
     });
 
-    // The built-in Hangouts extension is not required for Knogn and represents
-    // functionality we do not want silently active in a privacy-first browser.
     QTimer::singleShot(0, this, [this, manager] {
         for (const auto &extension : manager->extensions()) {
             disableUnwantedBuiltIn(extension);
@@ -111,7 +105,6 @@ bool PrivacyProfile::isPrivate() const {
 }
 
 bool PrivacyProfile::extensionsSupported() const {
-    // Qt WebEngine does not load user extensions into off-the-record profiles.
     return !privateMode_ && extensionManager();
 }
 
