@@ -34,7 +34,7 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.11.2'
-          modules: 'qtwebengine'
+          modules: 'qtwebengine qtwebchannel qttasktree'
           cache: true
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
