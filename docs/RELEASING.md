@@ -8,9 +8,9 @@ Knogn produces desktop install units in GitHub Actions using native runners and 
 | --- | --- | --- | --- |
 | Windows | x86-64 | NSIS `.exe` | `.zip` |
 | macOS | Apple Silicon | `.dmg` | `.zip` |
-| Linux | x86-64 | Debian `.deb` | `.tar.gz` |
+| Linux | x86-64 | Debian `.deb` | `.tar.xz` |
 
-Each platform artifact also contains `SHA256SUMS.txt` for integrity verification.
+Each platform artifact contains an architecture-specific SHA-256 checksum manifest.
 
 ## Pipeline
 
@@ -27,10 +27,13 @@ The workflow performs these steps on every platform:
 2. configure and compile Knogn in Release mode;
 3. let `qt_generate_deploy_app_script()` collect the Qt libraries, plugins, WebEngine process, resources and other runtime dependencies;
 4. run CPack with the platform-specific generators;
-5. calculate SHA-256 checksums;
-6. upload the platform artifact set.
+5. inspect the portable package and fail if Knogn, `QtWebEngineProcess`, or required WebEngine resources are missing;
+6. report package sizes and calculate SHA-256 checksums;
+7. upload the platform artifact set.
 
-For version tags, the three artifact sets are downloaded into a release job and attached to the matching GitHub Release.
+Linux packages omit Qt translations, strip deployable binaries, and use xz compression to keep the WebEngine distribution substantially smaller without dropping required runtime content.
+
+For version tags, the three artifact sets are downloaded into a release job and attached to the matching GitHub Release. Checksum manifests have platform-specific filenames so they can safely coexist in a release.
 
 ## Version release
 
