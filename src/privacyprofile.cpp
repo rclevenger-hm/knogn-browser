@@ -42,6 +42,12 @@ void PrivacyProfile::configureProfile() {
 
     auto *settings = profile_->settings();
     settings->setAttribute(QWebEngineSettings::BackForwardCacheEnabled, true);
+    settings->setAttribute(QWebEngineSettings::FullScreenSupportEnabled, true);
+    // Match desktop-browser media semantics rather than the more restrictive
+    // mobile-style gesture gate. Sites can still be muted/stopped by the user.
+    settings->setAttribute(QWebEngineSettings::PlaybackRequiresUserGesture, false);
+    settings->setAttribute(QWebEngineSettings::WebGLEnabled, true);
+    settings->setAttribute(QWebEngineSettings::Accelerated2dCanvasEnabled, true);
     settings->setAttribute(QWebEngineSettings::DnsPrefetchEnabled, false);
     settings->setAttribute(QWebEngineSettings::HyperlinkAuditingEnabled, false);
     settings->setAttribute(QWebEngineSettings::WebRTCPublicInterfacesOnly, true);
