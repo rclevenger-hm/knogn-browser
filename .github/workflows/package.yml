@@ -32,6 +32,34 @@ jobs:
         with:
           python-version: '3.13'
 
+      - name: Resolve Knogn version
+        shell: bash
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import os
+          import re
+
+          cmake = Path('CMakeLists.txt').read_text(encoding='utf-8')
+          match = re.search(r'project\(KnognBrowser\s+VERSION\s+([0-9]+\.[0-9]+\.[0-9]+)', cmake)
+          if not match:
+              raise SystemExit('Unable to resolve Knogn version from CMakeLists.txt')
+
+          version = match.group(1)
+          if os.environ.get('REF_TYPE') == 'tag':
+              expected = f'v{version}'
+              actual = os.environ.get('REF_NAME', '')
+              if actual != expected:
+                  raise SystemExit(f'Release tag {actual!r} does not match application version {expected!r}')
+
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as env_file:
+              env_file.write(f'KNOGN_VERSION={version}\n')
+          print(f'Knogn version: {version}')
+          PY
+
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
@@ -76,6 +104,49 @@ jobs:
           cpack --config build/CPackConfig.cmake -G DragNDrop -B dist
           cpack --config build/CPackConfig.cmake -G ZIP -B dist
 
+      - name: Normalize versioned package names
+        shell: bash
+        env:
+          RUNNER_OS_NAME: ${{ runner.os }}
+          ARTIFACT_NAME: ${{ matrix.artifact }}
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import os
+
+          dist = Path('dist')
+          version = os.environ['KNOGN_VERSION']
+          platform = os.environ['ARTIFACT_NAME']
+          os_name = os.environ['RUNNER_OS_NAME']
+
+          def one(pattern):
+              matches = [p for p in dist.glob(pattern) if p.is_file()]
+              if len(matches) != 1:
+                  raise SystemExit(f'Expected one {pattern} package, found {[p.name for p in matches]}')
+              return matches[0]
+
+          if os_name == 'Windows':
+              renames = {
+                  one('*.exe'): f'Knogn-{version}-windows-x86_64.exe',
+                  one('*.zip'): f'Knogn-{version}-windows-x86_64-portable.zip',
+              }
+          elif os_name == 'macOS':
+              renames = {
+                  one('*.dmg'): f'Knogn-{version}-macos-arm64.dmg',
+                  one('*.zip'): f'Knogn-{version}-macos-arm64-portable.zip',
+              }
+          else:
+              renames = {
+                  one('*.deb'): f'Knogn-{version}-linux-x86_64.deb',
+                  one('*.tar.xz'): f'Knogn-{version}-linux-x86_64-portable.tar.xz',
+              }
+
+          for source, target_name in renames.items():
+              target = dist / target_name
+              source.rename(target)
+              print(f'{source.name} -> {target.name}')
+          PY
+
       - name: Validate package contents and report sizes
         shell: bash
         env:
@@ -97,12 +168,12 @@ jobs:
 
           os_name = os.environ['RUNNER_OS_NAME']
           if os_name == 'Linux':
-              archive = next(dist.glob('*.tar.xz'))
+              archive = next(dist.glob('*-portable.tar.xz'))
               with tarfile.open(archive, 'r:xz') as handle:
                   names = handle.getnames()
               required = ['bin/Knogn', 'QtWebEngineProcess', 'qtwebengine_resources.pak']
           else:
-              archive = next(dist.glob('*.zip'))
+              archive = next(dist.glob('*-portable.zip'))
               with zipfile.ZipFile(archive) as handle:
                   names = handle.namelist()
               if os_name == 'Windows':
@@ -131,12 +202,14 @@ jobs:
           import os
 
           dist = Path('dist')
+          version = os.environ['KNOGN_VERSION']
+          platform = os.environ['ARTIFACT_NAME']
           files = sorted(p for p in dist.iterdir() if p.is_file() and not p.name.startswith('SHA256SUMS-'))
           lines = []
           for path in files:
               digest = hashlib.sha256(path.read_bytes()).hexdigest()
               lines.append(f'{digest}  {path.name}')
-          output = dist / f"SHA256SUMS-{os.environ['ARTIFACT_NAME']}.txt"
+          output = dist / f'SHA256SUMS-Knogn-{version}-{platform}.txt'
           output.write_text('\n'.join(lines) + '\n', encoding='utf-8')
           PY
 
@@ -175,15 +248,42 @@ jobs:
           path: release
           merge-multiple: true
 
+      - name: Verify release asset matrix
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import os
+
+          version = os.environ['GITHUB_REF_NAME'].removeprefix('v')
+          root = Path('release')
+          expected = [
+              f'Knogn-{version}-windows-x86_64.exe',
+              f'Knogn-{version}-windows-x86_64-portable.zip',
+              f'Knogn-{version}-linux-x86_64.deb',
+              f'Knogn-{version}-linux-x86_64-portable.tar.xz',
+              f'Knogn-{version}-macos-arm64.dmg',
+              f'Knogn-{version}-macos-arm64-portable.zip',
+              f'SHA256SUMS-Knogn-{version}-windows-x86_64.txt',
+              f'SHA256SUMS-Knogn-{version}-linux-x86_64.txt',
+              f'SHA256SUMS-Knogn-{version}-macos-arm64.txt',
+          ]
+          missing = [name for name in expected if not (root / name).is_file()]
+          if missing:
+              raise SystemExit(f'Release asset matrix is incomplete: {missing}')
+          print(f'Release v{version} contains all Windows, Linux, and macOS assets')
+          PY
+
       - name: Publish GitHub release assets
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
+          VERSION="${GITHUB_REF_NAME#v}"
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" release/* --clobber
           else
             gh release create "$GITHUB_REF_NAME" release/* \
-              --title "Knogn $GITHUB_REF_NAME" \
+              --title "Knogn $VERSION" \
               --generate-notes
           fi
