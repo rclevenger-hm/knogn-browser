@@ -4,24 +4,35 @@
 
 Knogn is an experimental privacy-first desktop browser built around a native Qt shell and Qt WebEngine. The project starts from a simple premise: a browser should know enough to serve its owner without turning that knowledge into telemetry, profiling, advertising data, or mandatory cloud state.
 
-Knogn is not attempting to build a new web rendering engine in v1. It uses a maintained Chromium-derived engine through Qt WebEngine for site compatibility while keeping the browser product, UI, privacy policy, storage behavior, extension UX, and performance controls under our control.
+Knogn is not attempting to build a new web rendering engine in v1. It uses a maintained Chromium-derived engine through Qt WebEngine for site compatibility while keeping the browser product, UI, privacy policy, storage behavior, extension UX, performance controls, settings, bookmarks, login storage, and network routing under our control.
 
 ## Current status
 
-Knogn is privacy-first and performance-focused, but **it is not yet proven faster than Chrome**. Initial 0.1.0 testing found Chrome Incognito ahead in raw network throughput on the same system. That result is being treated as a performance defect rather than hidden behind a marketing claim.
+Knogn is moving from an experimental browser shell toward a daily-driver browser. Version **0.2.0** adds the first product-level foundations that were absent from the early 0.1.x builds:
 
-Version 0.1.1 begins the measured performance work by removing an unnecessarily broad Chromium networking restriction and enabling Qt WebEngine's disabled-by-default back/forward cache while retaining the actual privacy controls. See [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) for the benchmark protocol and performance guardrails.
+- persistent Settings UI;
+- bookmarks/favorites with bookmark bar and manager;
+- bookmark import from Chrome, Edge and Brave plus standard bookmark HTML;
+- OS-keychain-backed saved login storage and CSV password import;
+- manual and optional single-match login autofill;
+- configurable home page and search provider template;
+- System / OS VPN networking plus direct, HTTP proxy and SOCKS5 routing modes;
+- a real embedded Windows executable icon and installer-created desktop shortcut;
+- the existing privacy, performance, media, branding and cross-platform packaging contracts.
 
-Version 0.1.2 begins the media-compatibility work after a Plex playback failure exposed a broader browser requirement. Knogn now explicitly supports HTML5 fullscreen behavior, desktop-style media playback policy, accelerated rendering paths, and a local runtime media capability page at **`knogn://media`**. The page reports the formats and DRM APIs exposed by the exact running WebEngine build without making network requests.
+Knogn is privacy-first and performance-focused, but **it is not yet proven faster than Chrome**. Initial 0.1.0 testing found Chrome Incognito ahead in raw network throughput on the same system. That result is treated as a performance defect rather than hidden behind a marketing claim. See [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md).
 
-Codec availability is an engine-build capability, not a UI toggle. Qt WebEngine requires a codec-enabled build for formats such as H.264/AAC MP4 and does not ship Widevine. Knogn therefore does not claim Chrome-level media parity until the actual release exposes the expected codec matrix. See [`docs/MEDIA.md`](docs/MEDIA.md).
+Knogn also **does not yet claim Chrome-level media codec/DRM parity**. Browser-side fullscreen/media support and `knogn://media` diagnostics are present, while issue #7 tracks H.264/AAC, MSE, Widevine and related engine/distribution work. See [`docs/MEDIA.md`](docs/MEDIA.md).
 
-## Milestone 0.1–0.1.2
+For the 0.2.0 feature boundaries and remaining daily-driver work, see [`docs/DAILY_DRIVER.md`](docs/DAILY_DRIVER.md).
 
-The runnable browser currently includes:
+## Browser features
 
-- native Qt Widgets browser chrome;
+The current browser includes:
+
+- native Qt Widgets browser chrome with the Knogn green identity;
 - tabs, omnibox/search, navigation, pop-up/new-tab handling and downloads;
+- a local branded `knogn://newtab` experience;
 - normal and private windows;
 - memory-only off-the-record private profiles;
 - third-party cookie/state blocking by default;
@@ -32,13 +43,14 @@ The runnable browser currently includes:
 - `DNT: 1` and `Sec-GPC: 1` preference headers;
 - back/forward cache enabled for faster history navigation;
 - automatic use of Qt WebEngine lifecycle recommendations to freeze/discard safe background tabs;
-- HTML5 fullscreen request support for video and other web content;
-- desktop-style media playback gesture behavior;
-- explicit accelerated WebGL/2D canvas paths;
-- local media/codec/DRM diagnostics at `knogn://media`;
 - Chrome/Chromium Manifest V3 extension installation for normal profiles;
-- explicit disabling of the built-in Hangouts extension;
-- privacy, source, performance and media compatibility contract tests;
+- persistent settings for home page, search template, bookmarks bar, passwords and network routing;
+- local bookmarks/favorites with manager, toolbar and imports;
+- secure saved-login secrets delegated to the OS credential store through QtKeychain;
+- saved-login CSV import, manual fill and optional single-match autofill;
+- System networking / OS VPN mode plus HTTP and SOCKS5 browser-specific tunnel configuration;
+- `knogn://media` runtime media capability diagnostics;
+- privacy, source, performance, media, branding and daily-driver contract tests;
 - Windows, Linux and macOS build CI;
 - native installer and portable-package generation for all three desktop platforms.
 
@@ -50,17 +62,35 @@ The `package-installers` workflow produces self-contained Qt WebEngine distribut
 - **macOS Apple Silicon:** `.dmg` disk image and portable `.zip`;
 - **Linux x86-64:** Debian `.deb` package and portable `.tar.xz`.
 
-Every platform artifact set includes its own SHA-256 checksum manifest. The pipeline also validates that the portable package contains Knogn, `QtWebEngineProcess`, and the required WebEngine resources before upload. New application versions merged to `main` are published automatically as versioned GitHub Releases.
+Every platform artifact set includes its own SHA-256 checksum manifest. The pipeline validates that the portable package contains Knogn, `QtWebEngineProcess`, and the required WebEngine resources before upload. New application versions merged to `main` are published automatically as versioned GitHub Releases.
 
-Current packages are unsigned development builds. Platform code signing/notarization is a separate release-hardening step; until signing is configured, Windows SmartScreen and macOS Gatekeeper may warn when launching downloaded builds.
+Current packages are unsigned development builds. Platform code signing/notarization remains a release-hardening step; until signing is configured, Windows SmartScreen and macOS Gatekeeper may warn when launching downloaded builds.
 
-See [`docs/RELEASING.md`](docs/RELEASING.md) for the release pipeline and artifact policy.
+See [`docs/RELEASING.md`](docs/RELEASING.md).
 
-## Media compatibility
+## Bookmarks and browser import
 
-Open **`knogn://media`** to inspect the running browser's actual media support. The diagnostic checks H.264/AAC, HEVC, AV1, VP8/VP9, Opus, Vorbis, FLAC, MP3, AC-3/E-AC-3, MSE, EME, Widevine, WebCodecs and related browser APIs.
+Use **Bookmarks → Add Bookmark** or `Ctrl+D` to save the current page. Bookmarks persist locally and can be displayed on the bookmark bar.
 
-Knogn's target is to play ordinary web media that mainstream browsers can play, but the project will distinguish browser feature bugs from codec/distribution constraints rather than spoof capability support. See [`docs/MEDIA.md`](docs/MEDIA.md) for the current compatibility policy and remaining codec work.
+**Bookmarks → Import Bookmarks** can automatically detect the default bookmark stores for Chrome, Edge and Brave when present. Knogn can also import Chromium `Bookmarks` JSON files and standard bookmark HTML exported by Firefox or other browsers.
+
+## Saved logins
+
+Saved login secrets are not written to Knogn's settings or bookmark files. QtKeychain delegates password storage to the platform credential service with insecure fallback disabled. Knogn stores only the site/username index and the generated credential key locally.
+
+Use **Passwords → Manage Passwords** to add/delete logins, **Import Passwords CSV** for browser-exported password CSV files, and **Fill Saved Login** on a site. Private windows do not expose saved logins.
+
+The 0.2.0 password manager is deliberately a foundation. Automatic login capture, passkeys, generated-password UX, richer form heuristics and breach monitoring are future work.
+
+## Network and VPN settings
+
+Knogn does not disguise a proxy as a VPN.
+
+- **System networking / OS VPN** follows the operating system's route and proxy settings. If the machine is connected to a VPN, Knogn follows that route.
+- **Direct connection** disables application proxy routing.
+- **HTTP proxy / tunnel** and **SOCKS5 proxy / tunnel** route Knogn through an explicitly configured endpoint.
+
+A true built-in VPN provider requires an actual tunnel implementation or provider service/driver and authentication layer. That is a separate future feature.
 
 ## Extension compatibility
 
@@ -83,8 +113,9 @@ The promises we are willing to make are documented in [`docs/PRIVACY.md`](docs/P
 ### Requirements
 
 - CMake 3.22+
+- Git (QtKeychain is fetched at configure time)
 - C++20 compiler
-- Qt 6.11+ with `Widgets`, `WebEngineWidgets`, and `WebEngineCore`
+- Qt 6.11+ with `Widgets`, `Network`, `WebEngineWidgets`, and `WebEngineCore`
 - Ninja is recommended but not required
 
 ### Linux
@@ -124,6 +155,8 @@ python3 tests/privacy_contract.py
 python3 tests/source_contract.py
 python3 tests/performance_contract.py
 python3 tests/media_contract.py
+python3 tests/branding_contract.py
+python3 tests/daily_driver_contract.py
 ```
 
 On a development system with Qt installed, `tools/check.sh` runs the contracts and performs a release build.
@@ -143,7 +176,7 @@ Engine adapter
         │
 Qt WebEngine / Chromium (v1)
         │
-Future experimental adapters (e.g. Servo)
+Future experimental adapters
 ```
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and the ADRs under [`docs/adr`](docs/adr).

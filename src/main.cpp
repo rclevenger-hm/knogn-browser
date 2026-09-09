@@ -3,18 +3,18 @@
 #include "browserwindow.h"
 
 #include <QApplication>
-#include <QCoreApplication>
 #include <QCommandLineParser>
+#include <QCoreApplication>
 
 int main(int argc, char *argv[]) {
-    // Qt WebEngine reads Chromium flags during initialization, so privacy flags
-    // must be applied before QApplication constructs any WebEngine objects.
-    applyKnognChromiumFlags();
-
+    // QSettings-backed startup configuration needs the application identity set
+    // before WebEngine reads Chromium flags during QApplication construction.
     QCoreApplication::setOrganizationName(QStringLiteral("Knogn"));
     QCoreApplication::setOrganizationDomain(QStringLiteral("knogn.local"));
     QCoreApplication::setApplicationName(QStringLiteral("Knogn"));
     QCoreApplication::setApplicationVersion(QStringLiteral(KNOGN_VERSION));
+
+    applyKnognChromiumFlags();
 
     QApplication app(argc, argv);
     app.setApplicationDisplayName(QStringLiteral("Knogn"));

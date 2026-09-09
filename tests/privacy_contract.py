@@ -5,6 +5,8 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 
 source = "\n".join(p.read_text(encoding="utf-8") for p in SRC.glob("*.*"))
+settings = (SRC / "appsettings.cpp").read_text(encoding="utf-8")
+profile = (SRC / "privacyprofile.cpp").read_text(encoding="utf-8")
 
 required = {
     "component update disabled": "--disable-component-update",
@@ -13,7 +15,9 @@ required = {
     "crash reporter disabled": "--disable-breakpad",
     "navigation pings disabled": "--no-pings",
     "push service disabled": "setPushServiceEnabled(false)",
-    "third-party state filter": "return !request.thirdParty",
+    "third-party state setting wired": "AppSettings::blockThirdPartyState" in profile,
+    "third-party state filter honors setting": "!blockThirdParty || !request.thirdParty" in profile,
+    "third-party state blocked by default": 'privacy/blockThirdPartyState"), true' in settings,
     "DNS prefetch disabled": "DnsPrefetchEnabled, false",
     "hyperlink auditing disabled": "HyperlinkAuditingEnabled, false",
     "WebRTC interface restriction": "WebRTCPublicInterfacesOnly, true",
@@ -21,7 +25,13 @@ required = {
     "DNT preference": '"DNT"',
 }
 
-missing = [name for name, needle in required.items() if needle not in source]
+missing = []
+for name, test in required.items():
+    if isinstance(test, bool):
+        if not test:
+            missing.append(name)
+    elif test not in source:
+        missing.append(name)
 if missing:
     raise SystemExit("Missing privacy invariants: " + ", ".join(missing))
 
