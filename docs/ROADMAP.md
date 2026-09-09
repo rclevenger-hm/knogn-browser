@@ -16,14 +16,15 @@
 - [x] Chrome Manifest V3 extension installer
 - [x] privacy/source contract tests
 - [x] Windows/Linux/macOS CI definition
+- [x] Windows/Linux/macOS installer and portable-package pipeline
 
 ## Milestone 0.2 — prove the privacy claim
 
 - [ ] startup network-leak integration harness using a local intercepting proxy
 - [ ] enumerate and classify every browser-owned startup request
 - [ ] test normal and private profiles independently
-- [ ] build artifacts from all desktop CI jobs
-- [ ] signed checksums and SBOM
+- [x] build artifacts from all desktop CI packaging jobs
+- [ ] signed release artifacts and SBOM
 - [ ] dependency/security update policy for Qt/Chromium
 
 ## Milestone 0.3 — daily-driver local services
@@ -67,8 +68,7 @@
 - picture-in-picture controls
 - developer tools launcher
 - optional E2E encrypted/self-hostable sync
-- Windows/Linux/macOS installers
-- ARM64 builds
+- ARM64 Windows/Linux builds
 - Android shell
 - Servo adapter prototype
 

@@ -24,7 +24,22 @@ The first runnable milestone already includes:
 - Chrome/Chromium Manifest V3 extension installation for normal profiles;
 - explicit disabling of the built-in Hangouts extension;
 - privacy/source contract tests;
-- Windows, Linux and macOS build CI.
+- Windows, Linux and macOS build CI;
+- native installer and portable-package generation for all three desktop platforms.
+
+## Install packages
+
+The `package-installers` workflow produces self-contained Qt WebEngine distributions on each native runner:
+
+- **Windows x86-64:** NSIS `.exe` installer and portable `.zip`;
+- **macOS Apple Silicon:** `.dmg` disk image and portable `.zip`;
+- **Linux x86-64:** Debian `.deb` package and portable `.tar.xz`.
+
+Every platform artifact set includes its own SHA-256 checksum manifest. The pipeline also validates that the portable package contains Knogn, `QtWebEngineProcess`, and the required WebEngine resources before upload. Tagged builds (`v*`) are attached to a GitHub Release automatically.
+
+Current packages are unsigned development builds. Platform code signing/notarization is a separate release-hardening step; until signing is configured, Windows SmartScreen and macOS Gatekeeper may warn when launching downloaded builds.
+
+See [`docs/RELEASING.md`](docs/RELEASING.md) for the release pipeline and artifact policy.
 
 ## Extension compatibility
 
@@ -51,12 +66,20 @@ The promises we are willing to make are documented in [`docs/PRIVACY.md`](docs/P
 - Qt 6.11+ with `Widgets`, `WebEngineWidgets`, and `WebEngineCore`
 - Ninja is recommended but not required
 
-### Linux/macOS
+### Linux
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
-./build/knogn-browser
+./build/Knogn
+```
+
+### macOS
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+open build/Knogn.app
 ```
 
 ### Windows
@@ -64,13 +87,13 @@ cmake --build build --parallel
 ```powershell
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release --parallel
-.\build\Release\knogn-browser.exe
+.\build\Release\Knogn.exe
 ```
 
 Start directly in a memory-only private profile with:
 
 ```bash
-knogn-browser --private
+Knogn --private
 ```
 
 ## Development checks
