@@ -6,7 +6,6 @@
 namespace {
 QList<QByteArray> requiredPrivacyFlags() {
     return {
-        QByteArrayLiteral("--disable-background-networking"),
         QByteArrayLiteral("--disable-component-update"),
         QByteArrayLiteral("--disable-domain-reliability"),
         QByteArrayLiteral("--disable-sync"),
