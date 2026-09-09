@@ -21,6 +21,8 @@ jobs:
         run: python tests/privacy_contract.py
       - name: Source contract
         run: python tests/source_contract.py
+      - name: Performance contract
+        run: python tests/performance_contract.py
 
   build:
     strategy:
