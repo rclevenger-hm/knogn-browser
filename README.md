@@ -33,9 +33,9 @@ The `package-installers` workflow produces self-contained Qt WebEngine distribut
 
 - **Windows x86-64:** NSIS `.exe` installer and portable `.zip`;
 - **macOS Apple Silicon:** `.dmg` disk image and portable `.zip`;
-- **Linux x86-64:** Debian `.deb` package and portable `.tar.gz`.
+- **Linux x86-64:** Debian `.deb` package and portable `.tar.xz`.
 
-Every artifact set includes `SHA256SUMS.txt`. Tagged builds (`v*`) are also attached to a GitHub Release automatically.
+Every platform artifact set includes its own SHA-256 checksum manifest. The pipeline also validates that the portable package contains Knogn, `QtWebEngineProcess`, and the required WebEngine resources before upload. Tagged builds (`v*`) are attached to a GitHub Release automatically.
 
 Current packages are unsigned development builds. Platform code signing/notarization is a separate release-hardening step; until signing is configured, Windows SmartScreen and macOS Gatekeeper may warn when launching downloaded builds.
 
