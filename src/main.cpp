@@ -1,3 +1,4 @@
+#include "branding.h"
 #include "browserflags.h"
 #include "browserwindow.h"
 
@@ -17,6 +18,8 @@ int main(int argc, char *argv[]) {
 
     QApplication app(argc, argv);
     app.setApplicationDisplayName(QStringLiteral("Knogn"));
+    app.setWindowIcon(Branding::applicationIcon(256));
+    app.setStyleSheet(Branding::applicationStyleSheet());
 
     QCommandLineParser parser;
     parser.setApplicationDescription(
