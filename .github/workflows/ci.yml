@@ -34,8 +34,9 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.11.2'
-          modules: 'qtwebengine qtwebchannel qttasktree'
+          modules: 'qtwebengine qtwebchannel qtpositioning qttasktree'
           cache: true
+          extra: '--base https://download.qt.io'
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
       - name: Build
