@@ -12,7 +12,11 @@ Knogn is privacy-first and performance-focused, but **it is not yet proven faste
 
 Version 0.1.1 begins the measured performance work by removing an unnecessarily broad Chromium networking restriction and enabling Qt WebEngine's disabled-by-default back/forward cache while retaining the actual privacy controls. See [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) for the benchmark protocol and performance guardrails.
 
-## Milestone 0.1 / 0.1.1
+Version 0.1.2 begins the media-compatibility work after a Plex playback failure exposed a broader browser requirement. Knogn now explicitly supports HTML5 fullscreen behavior, desktop-style media playback policy, accelerated rendering paths, and a local runtime media capability page at **`knogn://media`**. The page reports the formats and DRM APIs exposed by the exact running WebEngine build without making network requests.
+
+Codec availability is an engine-build capability, not a UI toggle. Qt WebEngine requires a codec-enabled build for formats such as H.264/AAC MP4 and does not ship Widevine. Knogn therefore does not claim Chrome-level media parity until the actual release exposes the expected codec matrix. See [`docs/MEDIA.md`](docs/MEDIA.md).
+
+## Milestone 0.1–0.1.2
 
 The runnable browser currently includes:
 
@@ -28,9 +32,13 @@ The runnable browser currently includes:
 - `DNT: 1` and `Sec-GPC: 1` preference headers;
 - back/forward cache enabled for faster history navigation;
 - automatic use of Qt WebEngine lifecycle recommendations to freeze/discard safe background tabs;
+- HTML5 fullscreen request support for video and other web content;
+- desktop-style media playback gesture behavior;
+- explicit accelerated WebGL/2D canvas paths;
+- local media/codec/DRM diagnostics at `knogn://media`;
 - Chrome/Chromium Manifest V3 extension installation for normal profiles;
 - explicit disabling of the built-in Hangouts extension;
-- privacy, source and performance contract tests;
+- privacy, source, performance and media compatibility contract tests;
 - Windows, Linux and macOS build CI;
 - native installer and portable-package generation for all three desktop platforms.
 
@@ -47,6 +55,12 @@ Every platform artifact set includes its own SHA-256 checksum manifest. The pipe
 Current packages are unsigned development builds. Platform code signing/notarization is a separate release-hardening step; until signing is configured, Windows SmartScreen and macOS Gatekeeper may warn when launching downloaded builds.
 
 See [`docs/RELEASING.md`](docs/RELEASING.md) for the release pipeline and artifact policy.
+
+## Media compatibility
+
+Open **`knogn://media`** to inspect the running browser's actual media support. The diagnostic checks H.264/AAC, HEVC, AV1, VP8/VP9, Opus, Vorbis, FLAC, MP3, AC-3/E-AC-3, MSE, EME, Widevine, WebCodecs and related browser APIs.
+
+Knogn's target is to play ordinary web media that mainstream browsers can play, but the project will distinguish browser feature bugs from codec/distribution constraints rather than spoof capability support. See [`docs/MEDIA.md`](docs/MEDIA.md) for the current compatibility policy and remaining codec work.
 
 ## Extension compatibility
 
@@ -109,6 +123,7 @@ Knogn --private
 python3 tests/privacy_contract.py
 python3 tests/source_contract.py
 python3 tests/performance_contract.py
+python3 tests/media_contract.py
 ```
 
 On a development system with Qt installed, `tools/check.sh` runs the contracts and performs a release build.
