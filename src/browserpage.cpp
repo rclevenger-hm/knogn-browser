@@ -35,7 +35,7 @@ BrowserPage::BrowserPage(QWebEngineProfile *profile,
     connect(this, &QWebEnginePage::fullScreenRequested,
             this, [this](QWebEngineFullScreenRequest request) {
         const bool enable = request.toggleOn();
-        auto *view = qobject_cast<QWebEngineView *>(parent());
+        auto *view = qobject_cast<QWebEngineView *>(this->parent());
         if (!view || !view->window()) {
             request.reject();
             return;
