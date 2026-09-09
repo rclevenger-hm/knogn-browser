@@ -116,7 +116,6 @@ jobs:
 
           dist = Path('dist')
           version = os.environ['KNOGN_VERSION']
-          platform = os.environ['ARTIFACT_NAME']
           os_name = os.environ['RUNNER_OS_NAME']
 
           def one(pattern):
@@ -235,13 +234,42 @@ jobs:
           compression-level: 0
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     needs: package
     runs-on: ubuntu-24.04
     permissions:
       contents: write
 
     steps:
+      - uses: actions/checkout@v5
+
+      - name: Resolve release identity
+        shell: bash
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import os
+          import re
+
+          cmake = Path('CMakeLists.txt').read_text(encoding='utf-8')
+          match = re.search(r'project\(KnognBrowser\s+VERSION\s+([0-9]+\.[0-9]+\.[0-9]+)', cmake)
+          if not match:
+              raise SystemExit('Unable to resolve Knogn version from CMakeLists.txt')
+
+          version = match.group(1)
+          tag = f'v{version}'
+          if os.environ.get('REF_TYPE') == 'tag' and os.environ.get('REF_NAME') != tag:
+              raise SystemExit(f'Release tag {os.environ.get("REF_NAME")!r} does not match application version {tag!r}')
+
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as env_file:
+              env_file.write(f'KNOGN_VERSION={version}\n')
+              env_file.write(f'KNOGN_TAG={tag}\n')
+          print(f'Release identity: Knogn {version} ({tag})')
+          PY
+
       - uses: actions/download-artifact@v5
         with:
           pattern: knogn-*
@@ -255,7 +283,7 @@ jobs:
           from pathlib import Path
           import os
 
-          version = os.environ['GITHUB_REF_NAME'].removeprefix('v')
+          version = os.environ['KNOGN_VERSION']
           root = Path('release')
           expected = [
               f'Knogn-{version}-windows-x86_64.exe',
@@ -271,19 +299,20 @@ jobs:
           missing = [name for name in expected if not (root / name).is_file()]
           if missing:
               raise SystemExit(f'Release asset matrix is incomplete: {missing}')
-          print(f'Release v{version} contains all Windows, Linux, and macOS assets')
+          print(f'Release {os.environ["KNOGN_TAG"]} contains all Windows, Linux, and macOS assets')
           PY
 
-      - name: Publish GitHub release assets
+      - name: Publish new version release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" release/* --clobber
-          else
-            gh release create "$GITHUB_REF_NAME" release/* \
-              --title "Knogn $VERSION" \
-              --generate-notes
+          if gh release view "$KNOGN_TAG" >/dev/null 2>&1; then
+            echo "Release $KNOGN_TAG already exists; leaving the published version unchanged."
+            exit 0
           fi
+
+          gh release create "$KNOGN_TAG" release/* \
+            --target "$GITHUB_SHA" \
+            --title "Knogn $KNOGN_VERSION" \
+            --generate-notes
