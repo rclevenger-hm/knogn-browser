@@ -23,6 +23,8 @@ jobs:
         run: python tests/source_contract.py
       - name: Performance contract
         run: python tests/performance_contract.py
+      - name: Media compatibility contract
+        run: python tests/media_contract.py
 
   build:
     strategy:
