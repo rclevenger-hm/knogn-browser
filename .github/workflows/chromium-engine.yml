@@ -1,0 +1,65 @@
+name: chromium-engine-spike
+
+on:
+  workflow_dispatch:
+    inputs:
+      media_experiment:
+        description: 'Enable the non-distributable proprietary-codec experiment'
+        required: true
+        default: false
+        type: boolean
+      build_browser:
+        description: 'Build the full Chromium browser target after bootstrap'
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+# Full Chromium source/build work is intentionally isolated from ordinary hosted
+# PR runners. A runner with this label should have substantial persistent disk,
+# RAM and CPU and should not be shared with untrusted workloads.
+jobs:
+  linux-engine:
+    runs-on: [self-hosted, linux, x64, knogn-chromium]
+    timeout-minutes: 720
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Validate backend definition
+        run: python tests/chromium_backend_contract.py
+
+      - name: Prepare Chromium workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(--workspace "$HOME/knogn-chromium" --execute)
+          if [[ "${{ inputs.media_experiment }}" == "true" ]]; then
+            args+=(--media-experiment)
+          fi
+          if [[ "${{ inputs.build_browser }}" == "true" ]]; then
+            args+=(--build)
+          fi
+          python engine/chromium/bootstrap.py "${args[@]}"
+
+      - name: Record engine build identity
+        if: ${{ inputs.build_browser }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          browser="$HOME/knogn-chromium/chromium/src/out/Knogn/chrome"
+          test -x "$browser"
+          echo "Chromium pin: $(cat engine/chromium/chromium_version.txt)"
+          "$browser" --version || true
+
+      - name: Media experiment distribution guard
+        if: ${{ inputs.media_experiment }}
+        shell: bash
+        run: |
+          echo "The proprietary-codec engine experiment is build-only."
+          echo "No package or artifact upload is permitted by this workflow."
