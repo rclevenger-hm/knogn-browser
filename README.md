@@ -2,191 +2,176 @@
 
 **Fast by omission. Private by design.**
 
-Knogn is an experimental privacy-first desktop browser built around a native Qt shell and Qt WebEngine. The project starts from a simple premise: a browser should know enough to serve its owner without turning that knowledge into telemetry, profiling, advertising data, or mandatory cloud state.
+Knogn is a privacy-first desktop browser. The 0.2.x line established the product shell, privacy model, settings, bookmarks, login storage, network controls, packaging and branding. The project is now moving to a **full Chromium browser backend** for the 0.3.x line.
 
-Knogn is not attempting to build a new web rendering engine in v1. It uses a maintained Chromium-derived engine through Qt WebEngine for site compatibility while keeping the browser product, UI, privacy policy, storage behavior, extension UX, performance controls, settings, bookmarks, login storage, and network routing under our control.
+The engine change is deliberate. Embedded Qt WebEngine proved too limiting for two daily-driver requirements Knogn considers non-negotiable:
 
-## Current status
+- mainstream federated account login such as Google, Microsoft, Apple and GitHub;
+- mainstream video/media playback including H.264/AAC, Media Source Extensions, Plex scenarios and Widevine where an approved CDM path exists.
 
-Knogn is moving from an experimental browser shell toward a daily-driver browser. Version **0.2.0** adds the first product-level foundations that were absent from the early 0.1.x builds:
+Knogn is not building a rendering engine from scratch. It tracks a pinned upstream Chromium stable source tree, applies a small Knogn product/privacy overlay, and builds the complete browser target.
 
-- persistent Settings UI;
-- bookmarks/favorites with bookmark bar and manager;
-- bookmark import from Chrome, Edge and Brave plus standard bookmark HTML;
-- OS-keychain-backed saved login storage and CSV password import;
-- manual and optional single-match login autofill;
-- configurable home page and search provider template;
-- System / OS VPN networking plus direct, HTTP proxy and SOCKS5 routing modes;
-- a real embedded Windows executable icon and installer-created desktop shortcut;
-- the existing privacy, performance, media, branding and cross-platform packaging contracts.
+## Current engine status
 
-Knogn is privacy-first and performance-focused, but **it is not yet proven faster than Chrome**. Initial 0.1.0 testing found Chrome Incognito ahead in raw network throughput on the same system. That result is treated as a performance defect rather than hidden behind a marketing claim. See [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md).
+**Primary development backend: full Chromium.**
 
-Knogn also **does not yet claim Chrome-level media codec/DRM parity**. Browser-side fullscreen/media support and `knogn://media` diagnostics are present, while issue #7 tracks H.264/AAC, MSE, Widevine and related engine/distribution work. See [`docs/MEDIA.md`](docs/MEDIA.md).
+**Compatibility fallback: Qt WebEngine 6.11.**
 
-For the 0.2.0 feature boundaries and remaining daily-driver work, see [`docs/DAILY_DRIVER.md`](docs/DAILY_DRIVER.md).
+Knogn **0.2.1 is the final Qt-WebEngine compatibility line**. Qt remains buildable while the Chromium backend reaches package parity, but new browser capability targets Chromium first. The first public **0.3.x** release must be a Chromium-backed build; it will not silently fall back to Qt.
 
-## Browser features
+See [`docs/ENGINE_MIGRATION.md`](docs/ENGINE_MIGRATION.md) and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-The current browser includes:
+## Why full Chromium
 
-- native Qt Widgets browser chrome with the Knogn green identity;
-- tabs, omnibox/search, navigation, pop-up/new-tab handling and downloads;
-- a local branded `knogn://newtab` experience;
-- normal and private windows;
-- memory-only off-the-record private profiles;
-- third-party cookie/state blocking by default;
-- disabled Qt/Chromium push service;
-- disabled DNS prefetch, hyperlink auditing, browser sync, component updates, domain reliability and crash reporting;
-- restricted WebRTC interface exposure;
-- session-scoped permission decisions;
-- `DNT: 1` and `Sec-GPC: 1` preference headers;
-- back/forward cache enabled for faster history navigation;
-- automatic use of Qt WebEngine lifecycle recommendations to freeze/discard safe background tabs;
-- Chrome/Chromium Manifest V3 extension installation for normal profiles;
-- persistent settings for home page, search template, bookmarks bar, passwords and network routing;
-- local bookmarks/favorites with manager, toolbar and imports;
-- secure saved-login secrets delegated to the OS credential store through QtKeychain;
-- saved-login CSV import, manual fill and optional single-match autofill;
-- System networking / OS VPN mode plus HTTP and SOCKS5 browser-specific tunnel configuration;
-- `knogn://media` runtime media capability diagnostics;
-- privacy, source, performance, media, branding and daily-driver contract tests;
-- Windows, Linux and macOS build CI;
-- native installer and portable-package generation for all three desktop platforms.
+A full Chromium browser gives Knogn control over the parts that matter for mainstream compatibility:
 
-## Install packages
+- browser identity rather than an embedded user-agent;
+- Chromium-native OAuth/OIDC/FedCM/WebAuthn surfaces;
+- Chromium-native tabs, profiles, bookmarks, history, permissions, downloads, password services and extensions;
+- compile-time media capability including the H.264/AAC experiment path;
+- Widevine key-system support without pretending the CDM itself is open source;
+- browser networking, sandboxing and site-isolation behavior;
+- platform-native Windows/macOS/Linux packaging paths.
 
-The `package-installers` workflow produces self-contained Qt WebEngine distributions on each native runner:
+Knogn keeps Google Chrome branding disabled and does not use official Google API keys. Browser-level Google OAuth client credentials are intentionally empty: Knogn needs normal **website login**, not Chrome Sync or a Google account coupled to the browser itself.
 
-- **Windows x86-64:** NSIS `.exe` installer and portable `.zip`;
-- **macOS Apple Silicon:** `.dmg` disk image and portable `.zip`;
-- **Linux x86-64:** Debian `.deb` package and portable `.tar.xz`.
+## Chromium development
 
-Every platform artifact set includes its own SHA-256 checksum manifest. The pipeline validates that the portable package contains Knogn, `QtWebEngineProcess`, and the required WebEngine resources before upload. New application versions merged to `main` are published automatically as versioned GitHub Releases.
+The Chromium checkout lives outside this repository because the source tree and build output are very large.
 
-Current packages are unsigned development builds. Platform code signing/notarization remains a release-hardening step; until signing is configured, Windows SmartScreen and macOS Gatekeeper may warn when launching downloaded builds.
+Prepare the pinned Chromium workspace:
 
-See [`docs/RELEASING.md`](docs/RELEASING.md).
+```bash
+python3 tools/build_knogn.py prepare
+```
 
-## Bookmarks and browser import
+Build Knogn's full Chromium browser target:
 
-Use **Bookmarks → Add Bookmark** or `Ctrl+D` to save the current page. Bookmarks persist locally and can be displayed on the bookmark bar.
+```bash
+python3 tools/build_knogn.py build
+```
 
-**Bookmarks → Import Bookmarks** can automatically detect the default bookmark stores for Chrome, Edge and Brave when present. Knogn can also import Chromium `Bookmarks` JSON files and standard bookmark HTML exported by Firefox or other browsers.
+Probe the built browser for identity and media capabilities:
 
-## Saved logins
+```bash
+python3 tools/build_knogn.py probe
+```
 
-Saved login secrets are not written to Knogn's settings or bookmark files. QtKeychain delegates password storage to the platform credential service with insecure fallback disabled. Knogn stores only the site/username index and the generated credential key locally.
+Run the local H.264/AAC media-parity experiment:
 
-Use **Passwords → Manage Passwords** to add/delete logins, **Import Passwords CSV** for browser-exported password CSV files, and **Fill Saved Login** on a site. Private windows do not expose saved logins.
+```bash
+python3 tools/build_knogn.py build --media-experiment
+python3 tools/build_knogn.py probe --require-media
+```
 
-The 0.2.0 password manager is deliberately a foundation. Automatic login capture, passkeys, generated-password UX, richer form heuristics and breach monitoring are future work.
+The proprietary-codec experiment is **not approved for public redistribution** until codec redistribution rights are resolved.
 
-## Network and VPN settings
+The legacy Qt fallback now requires an explicit command:
 
-Knogn does not disguise a proxy as a VPN.
+```bash
+python3 tools/build_knogn.py qt-fallback
+```
 
-- **System networking / OS VPN** follows the operating system's route and proxy settings. If the machine is connected to a VPN, Knogn follows that route.
-- **Direct connection** disables application proxy routing.
-- **HTTP proxy / tunnel** and **SOCKS5 proxy / tunnel** route Knogn through an explicitly configured endpoint.
+## Chromium overlay
 
-A true built-in VPN provider requires an actual tunnel implementation or provider service/driver and authentication layer. That is a separate future feature.
+`engine/chromium/bootstrap.py` uses Chromium's depot_tools/fetch/gclient workflow and applies `engine/chromium/knogn_overlay.py` before GN generation.
 
-## Extension compatibility
+The current overlay:
 
-### Chrome / Chromium
+- rewrites Chromium product branding metadata to Knogn;
+- installs the approved Knogn Windows icon into Chromium's open-source branding path;
+- replaces the base Chromium product SVG with the Knogn mark;
+- changes Chromium MetricsReporting to disabled by default;
+- leaves Google Chrome branding disabled;
+- leaves official Google API keys disabled;
+- leaves browser-level Google OAuth credentials empty.
 
-Knogn's first engine supports zipped and unpacked **Manifest V3** Chrome extensions through Qt WebEngine 6.11. Extensions are installed per normal profile. Private/off-the-record windows intentionally do not load user extensions because Qt WebEngine does not permit them there.
+The overlay is intentionally small and fail-fast. Larger downstream changes should become reviewable Chromium patch files rather than an ever-growing text-rewrite script.
 
-### Firefox
+## Identity acceptance
 
-Firefox WebExtensions are a planned compatibility layer, not a claim that arbitrary `.xpi` files work today. Many modern Firefox extensions share the WebExtensions model with Chromium, but Firefox-specific APIs and background semantics must be inspected and translated where possible. See [`docs/EXTENSIONS.md`](docs/EXTENSIONS.md).
+Issue #10 tracks federated identity parity. The Chromium backend is not considered ready until released builds demonstrate representative:
+
+- Google website login;
+- third-party **Sign in with Google**;
+- Microsoft OAuth/OIDC;
+- Apple sign-in;
+- GitHub OAuth;
+- FedCM flows where used;
+- passkeys/WebAuthn.
+
+Knogn does not spoof Chrome to bypass provider security checks.
+
+## Media acceptance
+
+Issue #7 tracks media parity. The Chromium backend is not considered ready until released builds demonstrate:
+
+- H.264/AVC + AAC playback;
+- H.264/AAC through Media Source Extensions;
+- MP3, FLAC, Opus/Vorbis, VP9 and AV1 where supported;
+- Plex direct-play and transcoded playback;
+- Widevine playback where a legitimate CDM installation/distribution path exists.
+
+The normal Chromium profile compiles Widevine key-system support but does **not** bundle a Widevine CDM. Local proprietary-codec experiments use Chromium's `proprietary_codecs`/FFmpeg branding path and are kept out of public artifacts until licensing is resolved.
 
 ## Privacy boundary
 
 Knogn aims to eliminate **browser-owned tracking and unsolicited browser-owned network traffic**. That does not make the user anonymous. Websites, search providers, ISPs, logged-in services, extensions and network observers can still learn information about a browsing session.
 
-The promises we are willing to make are documented in [`docs/PRIVACY.md`](docs/PRIVACY.md) and [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md). Privacy-sensitive defaults are also asserted by tests so regressions are visible in CI.
+Hard requirements include:
 
-## Build
+- no Knogn telemetry/analytics endpoint;
+- Chromium MetricsReporting disabled by default;
+- no browser-level Google account requirement;
+- normal website authentication remains functional;
+- sandboxing, site isolation and Chromium multiprocess security stay enabled;
+- private profiles remain ephemeral;
+- third-party-state protections are not globally disabled to fix login compatibility;
+- performance work cannot trade away security or compatibility.
 
-### Requirements
+See [`docs/PRIVACY.md`](docs/PRIVACY.md) and [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md).
 
-- CMake 3.22+
-- Git (QtKeychain is fetched at configure time)
-- C++20 compiler
-- Qt 6.11+ with `Widgets`, `Network`, `WebEngineWidgets`, and `WebEngineCore`
-- Ninja is recommended but not required
+## 0.2.x compatibility features
 
-### Linux
+The Qt compatibility line already includes:
 
-```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel
-./build/Knogn
-```
+- Knogn green branding and Windows desktop icon/installer identity;
+- tabs, omnibox/search, navigation and downloads;
+- persistent normal and memory-only private profiles;
+- third-party-state blocking and identity-provider exceptions;
+- DNT and GPC signals;
+- settings for search, home page, downloads, privacy, passwords and network routing;
+- bookmarks/favorites with import from Chromium-family stores and standard bookmark HTML;
+- OS-keychain-backed saved logins and browser password CSV import;
+- system-VPN routing plus HTTP/SOCKS tunnel settings;
+- Chrome/Chromium Manifest V3 extension installation;
+- `knogn://media` and `knogn://identity` diagnostics;
+- Windows, Linux and macOS installers/portable packages.
 
-### macOS
+These features are migration requirements for Chromium rather than reasons to keep extending the Qt shell.
 
-```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel
-open build/Knogn.app
-```
+## CI and heavy engine builds
 
-### Windows
+Hosted CI validates privacy, source, performance, media, identity, branding and Chromium-backend contracts. The Qt fallback remains compiled on all three desktop systems during migration.
 
-```powershell
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --config Release --parallel
-.\build\Release\Knogn.exe
-```
+A full Chromium source build runs through `.github/workflows/chromium-engine.yml` on dedicated self-hosted capacity with the `knogn-chromium` label. A persistent workspace is expected because Chromium source and object output are too large for normal ephemeral PR runners.
 
-Start directly in a memory-only private profile with:
+The engine workflow can build either the public open-codec baseline or the local media experiment. Media-experiment output is never uploaded by that workflow.
 
-```bash
-Knogn --private
-```
+## Performance
 
-## Development checks
+Knogn is **not yet proven faster than Chrome**. Earlier 0.1 testing showed Chrome Incognito ahead in raw throughput on the same system. That remains a benchmark Knogn must beat through measured engineering rather than marketing language.
 
-```bash
-python3 tests/privacy_contract.py
-python3 tests/source_contract.py
-python3 tests/performance_contract.py
-python3 tests/media_contract.py
-python3 tests/branding_contract.py
-python3 tests/daily_driver_contract.py
-```
+Full Chromium removes the Qt embedding layer as a confounding variable. Performance will be measured across startup, network throughput, memory, CPU, page responsiveness and battery behavior while preserving browser security and compatibility.
 
-On a development system with Qt installed, `tools/check.sh` runs the contracts and performs a release build.
-
-## Architecture
-
-Knogn is deliberately layered so the shell does not become inseparable from one renderer:
-
-```text
-Native browser shell
-        │
-Browser services / local state
-        │
-Privacy + security policy
-        │
-Engine adapter
-        │
-Qt WebEngine / Chromium (v1)
-        │
-Future experimental adapters
-```
-
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and the ADRs under [`docs/adr`](docs/adr).
+See [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md).
 
 ## Product principle
 
 > Your browser should know you. Nobody else should.
 
-Knogn will prefer local features, explicit user actions, inspectable behavior, and performance that comes from doing less unnecessary work—not from silently weakening security.
+Knogn favors local state, explicit user action, inspectable behavior and doing less unnecessary work.
 
 ## License
 
-MIT. See [`LICENSE`](LICENSE).
+Knogn-owned code is MIT licensed. Chromium and third-party components retain their upstream licenses. Codec and DRM distribution rights are handled separately from the Knogn source-code license.

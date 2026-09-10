@@ -18,7 +18,7 @@
 - [x] Windows/Linux/macOS CI definition
 - [x] Windows/Linux/macOS installer and portable-package pipeline
 
-## Milestone 0.2 — daily-driver foundations
+## Milestone 0.2 — daily-driver foundations (Qt compatibility line)
 
 - [x] persistent Settings UI
 - [x] configurable search engines, home page and downloads
@@ -28,42 +28,77 @@
 - [x] password CSV import, manual fill and optional autofill
 - [x] system VPN routing plus HTTP/SOCKS browser-specific tunnel settings
 - [x] Windows executable/installer icon and desktop shortcut integration
-- [ ] local history + retention/clear-on-exit controls
-- [ ] session restore / recently closed tabs
-- [ ] download history/manager
-- [ ] richer bookmark folders/editing
+- [x] narrow identity-provider state exceptions
+- [x] `knogn://identity` diagnostics
 
-## Milestone 0.2.1 — compatibility blockers
+Knogn 0.2.1 is the final Qt-WebEngine compatibility line. Remaining browser-product work moves to Chromium unless a Qt-only regression must be repaired for existing 0.2.x users.
 
-- [x] keep third-party state blocked generally while allowing narrow known identity-provider state
-- [x] modern Windows application manifest for correct browser/OS identity reporting
-- [x] local `knogn://identity` diagnostics for Credentials API, FedCM surface, WebAuthn and Storage Access
-- [ ] successful representative Sign in with Google flow
-- [ ] successful Microsoft / Apple / GitHub OAuth flows
-- [ ] prove FedCM behavior on released builds
-- [ ] H.264/AAC direct playback in released packages
-- [ ] H.264/AAC Media Source Extensions playback
-- [ ] Widevine detection/integration through an approved distribution path
-- [ ] Plex direct-play and transcode compatibility tests
+## Milestone 0.3 — full Chromium browser backend (ACTIVE)
 
-## Milestone 0.3 — full Chromium browser backend
+Chromium is now the primary development target. Qt WebEngine is an explicit fallback only until the Chromium packages pass the production gates.
 
-Qt WebEngine remains the bootstrap backend while Knogn brings up a full Chromium browser target. The Chromium path is now the highest-priority engine work because both federated identity and mainstream media expose hard limits of an embedded WebEngine shell.
+### Engine and build
 
 - [x] adopt full-browser backend decision (ADR 0004)
-- [x] pin initial Chromium backend spike to an upstream stable version
-- [x] add baseline GN configuration and codec experiment notes
-- [ ] external Chromium checkout/bootstrap tooling
-- [ ] Knogn patch-overlay framework
-- [ ] remove/disable unwanted browser-owned Google services without breaking ordinary Google websites
-- [ ] Knogn branding/product resources in Chromium UI
-- [ ] privacy network-leak contract against the Chromium target
-- [ ] normal/private profile parity
-- [ ] extension compatibility parity
-- [ ] federated identity test suite
-- [ ] media capability/playback test suite
-- [ ] Windows/Linux/macOS packages from the Chromium backend
-- [ ] security-update/rebase automation tracking upstream stable
+- [x] pin an upstream Chromium stable version
+- [x] external depot_tools/fetch/gclient bootstrap tooling
+- [x] dedicated self-hosted Chromium engine workflow
+- [x] Chromium-first `tools/build_knogn.py` developer entrypoint
+- [x] Knogn source-overlay framework applied before GN generation
+- [x] runtime identity/media probe for built Chromium
+- [x] mark Qt builds as compatibility fallback in CI
+- [ ] successful dedicated full Chromium build from the pinned source
+- [ ] reproducible Windows Chromium build lane
+- [ ] reproducible macOS Chromium build lane
+
+### Product identity and privacy
+
+- [x] replace Chromium BRANDING metadata with Knogn
+- [x] replace base Windows Chromium icon with Knogn icon
+- [x] replace base product SVG with Knogn mark
+- [x] disable Chromium MetricsReporting feature by default in source overlay
+- [x] keep Google Chrome branding disabled
+- [x] keep official Google API keys disabled
+- [x] keep browser-level Google OAuth client ID/secret empty
+- [ ] port Knogn new-tab/settings/bookmarks/password UX into Chromium-native UI
+- [ ] port normal/private profile defaults
+- [ ] zero unsolicited Knogn-owned startup traffic proof against Chromium target
+- [ ] EasyPrivacy/request-blocking layer on Chromium network stack
+
+### Federated identity acceptance
+
+- [ ] successful direct Google website login
+- [ ] successful third-party “Sign in with Google” flow
+- [ ] successful Microsoft OAuth/OIDC flow
+- [ ] successful Apple sign-in flow
+- [ ] successful GitHub OAuth flow
+- [ ] FedCM compatibility where sites use it
+- [ ] passkeys/WebAuthn UX and end-to-end test
+
+Browser-level Chrome Sync authentication is intentionally not a requirement. Knogn needs standards-based website authentication without inheriting Chrome account coupling.
+
+### Media acceptance
+
+- [x] compile Widevine key-system support hook without bundling a CDM
+- [x] local H.264/AAC proprietary-codec experiment configuration
+- [x] runtime H.264/AAC/MSE probe
+- [ ] H.264/AAC direct playback in full Chromium test build
+- [ ] H.264/AAC Media Source Extensions playback
+- [ ] Plex direct-play scenario
+- [ ] Plex transcoded-stream scenario
+- [ ] approved Widevine CDM installation/distribution path
+- [ ] representative Widevine playback scenario
+- [ ] public codec redistribution/legal review before shipping codec-enabled packages
+
+### Distribution
+
+- [ ] package Chromium backend for Windows x86-64
+- [ ] package Chromium backend for macOS ARM64
+- [ ] package Chromium backend for Linux x86-64
+- [ ] sign/notarize platform builds
+- [ ] SBOM and dependency manifest
+- [ ] automated upstream Chromium stable tracking/rebase
+- [ ] publish Knogn 0.3.x only after Chromium package matrix passes
 
 ## Milestone 0.4 — privacy engine
 
@@ -77,7 +112,6 @@ Qt WebEngine remains the bootstrap backend while Knogn brings up a full Chromium
 - [ ] local-only privacy dashboard
 - [ ] startup network-leak integration harness using a local intercepting proxy
 - [ ] enumerate and classify every browser-owned startup request
-- [ ] signed release artifacts, SBOM and dependency policy
 
 ## Milestone 0.5 — extension breadth
 
@@ -91,13 +125,11 @@ Qt WebEngine remains the bootstrap backend while Knogn brings up a full Chromium
 ## Later
 
 - automatic password-save detection
-- passkeys/WebAuthn UX
 - generated passwords
 - profiles/containers
 - reader mode
 - vertical tabs/tab groups
 - picture-in-picture controls
-- developer tools launcher
 - optional E2E encrypted/self-hostable sync
 - ARM64 Windows/Linux builds
 - Android shell
@@ -105,4 +137,4 @@ Qt WebEngine remains the bootstrap backend while Knogn brings up a full Chromium
 
 ## Definition of faster
 
-Knogn will publish reproducible numbers rather than rely on perceived speed. Performance targets include startup latency, idle RSS, multi-tab RSS, page responsiveness, load CPU, network throughput and battery impact. A speed optimization that weakens sandboxing, identity security or privacy policy is not an acceptable optimization.
+Knogn will publish reproducible numbers rather than rely on perceived speed. Performance targets include startup latency, idle RSS, multi-tab RSS, page responsiveness, load CPU, network throughput and battery impact. A speed optimization that weakens sandboxing, identity security or privacy policy is not acceptable.

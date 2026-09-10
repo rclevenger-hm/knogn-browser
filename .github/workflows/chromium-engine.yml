@@ -1,10 +1,10 @@
-name: chromium-engine-spike
+name: chromium-engine
 
 on:
   workflow_dispatch:
     inputs:
       media_experiment:
-        description: 'Enable the non-distributable proprietary-codec experiment'
+        description: 'Enable local H.264/AAC codec parity experiment; never publish this output automatically'
         required: true
         default: false
         type: boolean
@@ -17,9 +17,10 @@ on:
 permissions:
   contents: read
 
-# Full Chromium source/build work is intentionally isolated from ordinary hosted
-# PR runners. A runner with this label should have substantial persistent disk,
-# RAM and CPU and should not be shared with untrusted workloads.
+# Full Chromium source/build work is isolated from ordinary hosted PR runners.
+# A runner with this label needs substantial persistent disk/RAM/CPU and must not
+# execute untrusted workloads. The workspace is intentionally persistent so
+# Chromium source and object caches survive between runs.
 jobs:
   linux-engine:
     runs-on: [self-hosted, linux, x64, knogn-chromium]
@@ -31,10 +32,12 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: Validate backend definition
-        run: python tests/chromium_backend_contract.py
+      - name: Validate Chromium backend contracts
+        run: |
+          python tests/chromium_backend_contract.py
+          python tests/chromium_primary_contract.py
 
-      - name: Prepare Chromium workspace
+      - name: Prepare and build Knogn Chromium
         shell: bash
         run: |
           set -euo pipefail
@@ -55,11 +58,22 @@ jobs:
           browser="$HOME/knogn-chromium/chromium/src/out/Knogn/chrome"
           test -x "$browser"
           echo "Chromium pin: $(cat engine/chromium/chromium_version.txt)"
-          "$browser" --version || true
+          "$browser" --version
+
+      - name: Probe browser identity and web-platform surfaces
+        if: ${{ inputs.build_browser }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(--out "$HOME/knogn-chromium/chromium/src/out/Knogn")
+          if [[ "${{ inputs.media_experiment }}" == "true" ]]; then
+            args+=(--require-media)
+          fi
+          python engine/chromium/probe_runtime.py "${args[@]}"
 
       - name: Media experiment distribution guard
         if: ${{ inputs.media_experiment }}
         shell: bash
         run: |
-          echo "The proprietary-codec engine experiment is build-only."
+          echo "The proprietary-codec engine experiment is build-and-test only."
           echo "No package or artifact upload is permitted by this workflow."

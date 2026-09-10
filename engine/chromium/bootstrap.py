@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
-"""Prepare an external Chromium workspace for the Knogn full-browser backend.
+"""Prepare and optionally build Knogn's full Chromium backend.
 
-Chromium is intentionally not vendored into knogn-browser. This tool uses the
-upstream depot_tools workflow, checks out the revision pinned in
-chromium_version.txt, synchronizes DEPS, runs Chromium hooks, and generates an
-out/Knogn directory from args.gn.example.
+Chromium remains in an external workspace. The tool uses the upstream depot_tools
+workflow, checks out the pinned stable version, syncs DEPS, applies the Knogn
+source overlay, generates out/Knogn, and optionally builds the full browser target.
 
-The default mode is a dry run so CI can validate the plan without downloading a
-large Chromium checkout. Pass --execute for the storage/network-heavy operation.
+Default mode is a dry run so normal CI can validate the exact plan without
+performing a multi-gigabyte Chromium checkout. Use --execute for real work.
 """
 
 from __future__ import annotations
@@ -17,15 +16,16 @@ import os
 from pathlib import Path
 import platform
 import subprocess
+import sys
 
 HERE = Path(__file__).resolve().parent
 PIN_FILE = HERE / "chromium_version.txt"
 ARGS_FILE = HERE / "args.gn.example"
+OVERLAY = HERE / "knogn_overlay.py"
 DEPOT_TOOLS_URL = "https://chromium.googlesource.com/chromium/tools/depot_tools.git"
 
 
 def executable_command(command: list[str]) -> list[str]:
-    """Wrap depot_tools batch commands correctly when invoked from Python."""
     if platform.system() != "Windows":
         return command
     if command and command[0] in {"fetch", "gclient", "gn", "autoninja"}:
@@ -57,33 +57,38 @@ def render_args(media_experiment: bool) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Prepare the Knogn Chromium backend workspace")
+    parser = argparse.ArgumentParser(description="Prepare/build Knogn's Chromium backend")
     parser.add_argument(
         "--workspace",
         type=Path,
         default=Path.home() / "knogn-chromium",
-        help="external workspace; Chromium is never written into the Knogn repo",
+        help="external workspace; Chromium is never vendored into the Knogn repo",
     )
     parser.add_argument(
         "--execute",
         action="store_true",
-        help="run checkout/sync/hooks/GN commands instead of only printing them",
+        help="perform checkout/sync/overlay/GN operations instead of printing them",
     )
     parser.add_argument(
         "--media-experiment",
         action="store_true",
-        help="generate proprietary-codec experiment args; not approved for public distribution",
+        help="enable H.264/AAC-capable Chromium build settings for local testing only",
     )
     parser.add_argument(
         "--skip-fetch",
         action="store_true",
-        help="require an existing Chromium src checkout instead of running fetch",
+        help="require an existing Chromium checkout instead of running fetch",
+    )
+    parser.add_argument(
+        "--skip-overlay",
+        action="store_true",
+        help="do not apply the Knogn product/privacy source overlay (diagnostic use only)",
     )
     parser.add_argument(
         "--jobs",
         type=int,
         default=max(2, (os.cpu_count() or 4) - 1),
-        help="ninja parallelism used only when --build is supplied",
+        help="autoninja parallelism when --build is supplied",
     )
     parser.add_argument(
         "--build",
@@ -99,11 +104,11 @@ def main() -> int:
     src = chromium_root / "src"
     out = src / "out" / "Knogn"
 
-    print(f"Knogn Chromium pin: {version}")
-    print(f"Host platform: {platform.system()} {platform.machine()}")
+    print(f"Knogn primary engine: Chromium {version}")
+    print(f"Host: {platform.system()} {platform.machine()}")
     print(f"External workspace: {workspace}")
     if args.media_experiment:
-        print("MEDIA EXPERIMENT: proprietary codecs enabled in generated args; DO NOT DISTRIBUTE by default")
+        print("MEDIA EXPERIMENT: proprietary codecs enabled; local validation only, do not publish")
 
     if args.execute:
         workspace.mkdir(parents=True, exist_ok=True)
@@ -111,8 +116,6 @@ def main() -> int:
     env = os.environ.copy()
     env["PATH"] = str(depot) + os.pathsep + env.get("PATH", "")
     if platform.system() == "Windows":
-        # Chromium's public Windows instructions use the locally installed
-        # Visual Studio toolchain when this is 0.
         env.setdefault("DEPOT_TOOLS_WIN_TOOLCHAIN", "0")
 
     if not depot.exists():
@@ -127,17 +130,10 @@ def main() -> int:
             raise SystemExit(f"--skip-fetch supplied but {src} does not exist")
         if args.execute:
             chromium_root.mkdir(parents=True, exist_ok=True)
-        run(
-            ["fetch", "--nohooks", "--no-history", "chromium"],
-            cwd=chromium_root,
-            env=env,
-            execute=args.execute,
-        )
+        run(["fetch", "--nohooks", "--no-history", "chromium"], cwd=chromium_root, env=env, execute=args.execute)
     else:
         print(f"+ Chromium checkout already exists at {src}")
 
-    # Align Chromium and every DEPS-managed repository to the explicit stable
-    # version pin before hooks or generated build files are run.
     run(["git", "fetch", "origin", "--tags", "--force"], cwd=src, env=env, execute=args.execute)
     run(["git", "checkout", "--detach", version], cwd=src, env=env, execute=args.execute)
     run(
@@ -148,14 +144,14 @@ def main() -> int:
     )
 
     if platform.system() == "Linux":
-        run(
-            ["./build/install-build-deps.sh", "--no-prompt"],
-            cwd=src,
-            env=env,
-            execute=args.execute,
-        )
+        run(["./build/install-build-deps.sh", "--no-prompt"], cwd=src, env=env, execute=args.execute)
 
     run(["gclient", "runhooks"], cwd=src, env=env, execute=args.execute)
+
+    if not args.skip_overlay:
+        print(f"+ {sys.executable} {OVERLAY} {src}")
+        if args.execute:
+            subprocess.run([sys.executable, str(OVERLAY), str(src)], check=True)
 
     generated_args = render_args(args.media_experiment)
     print(f"+ write {out / 'args.gn'} from {ARGS_FILE}")
@@ -173,11 +169,15 @@ def main() -> int:
             execute=args.execute,
         )
 
-    if not args.execute:
-        print("\nBootstrap dry run complete. Re-run with --execute to perform these steps.")
+    if args.execute:
+        print(f"\nKnogn Chromium backend prepared at {out}")
+        if args.build:
+            print("Full Chromium browser target built.")
     else:
-        print("\nChromium workspace prepared.")
-    print("Public Knogn packages must keep the proprietary-codec experiment disabled until redistribution rights are resolved.")
+        print("\nDry run complete. Use --execute to perform the Chromium preparation/build.")
+
+    if args.media_experiment:
+        print("Media experiment output is not approved for public redistribution.")
     return 0
 
 

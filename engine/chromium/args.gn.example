@@ -1,8 +1,8 @@
-# Knogn Chromium backend spike.
+# Knogn Chromium primary backend.
 #
-# This profile intentionally builds Chromium branding, not Google Chrome. It is
-# the baseline for removing browser-owned Google services before Knogn branding
-# and product patches are layered on top.
+# This is an open-source Chromium build with Knogn product overlays. It is not a
+# Google Chrome branded build and intentionally does not embed restricted browser
+# OAuth credentials or official Google API keys.
 
 is_debug = false
 is_official_build = true
@@ -13,20 +13,20 @@ v8_symbol_level = 0
 
 is_chrome_branded = false
 use_official_google_api_keys = false
+google_api_key = ""
+google_default_client_id = ""
+google_default_client_secret = ""
 
-# Baseline open-codec build. The media parity experiment uses the two settings
-# below instead, but release distribution must remain disabled until the codec
-# licensing path is explicitly approved:
-#
-# proprietary_codecs = true
-# ffmpeg_branding = "Chrome"
-#
-# Chromium's build files require non-Chromium FFmpeg branding whenever
-# proprietary_codecs is enabled.
+# Keep Widevine key-system support compiled in so an approved separately supplied
+# CDM can be discovered later. This does not bundle or redistribute Widevine.
+enable_widevine = true
+
+# Public baseline remains open-codec-only until codec redistribution rights are
+# resolved. Local media-parity experiments switch these two values to true/Chrome.
 proprietary_codecs = false
 ffmpeg_branding = "Chromium"
 
-# Keep the browser target lean where possible without disabling web-platform
-# compatibility expected by normal sites.
+# Compatibility first. Avoid removing standards or browser surfaces merely to
+# reduce binary size.
 enable_nacl = false
 rtc_use_pipewire = true

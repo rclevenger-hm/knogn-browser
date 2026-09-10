@@ -33,8 +33,12 @@ jobs:
         run: python tests/identity_contract.py
       - name: Chromium backend bootstrap contract
         run: python tests/chromium_backend_contract.py
+      - name: Chromium primary-backend contract
+        run: python tests/chromium_primary_contract.py
 
-  build:
+  # Qt is retained only as a compatibility fallback during the 0.3 migration.
+  # Full Chromium builds run in chromium-engine.yml on dedicated self-hosted capacity.
+  qt-fallback-build:
     strategy:
       fail-fast: false
       matrix:
@@ -42,7 +46,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
-      - name: Install Qt
+      - name: Install Qt fallback dependencies
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.11.2'
@@ -50,7 +54,7 @@ jobs:
           cache: true
           aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@16db45a70b5905ad596941b223469bc86a56901e'
           extra: '--base https://download.qt.io'
-      - name: Configure
+      - name: Configure Qt fallback
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-      - name: Build
+      - name: Build Qt fallback
         run: cmake --build build --config Release --parallel 2

@@ -1,18 +1,16 @@
-name: package-installers
+name: qt-compat-packages
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    tags: ['v*']
-  pull_request:
-    branches: [main]
 
 permissions:
   contents: read
 
+# Knogn 0.2.1 is the final Qt-WebEngine compatibility line. This workflow is
+# retained only for manual regression/support builds. New public Knogn releases
+# must come from the full Chromium backend.
 jobs:
-  package:
+  package-qt-fallback:
     strategy:
       fail-fast: false
       matrix:
@@ -27,40 +25,25 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
-
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
 
-      - name: Resolve Knogn version
+      - name: Resolve compatibility version
         shell: bash
-        env:
-          REF_TYPE: ${{ github.ref_type }}
-          REF_NAME: ${{ github.ref_name }}
         run: |
           python - <<'PY'
           from pathlib import Path
-          import os
-          import re
-
-          cmake = Path('CMakeLists.txt').read_text(encoding='utf-8')
-          match = re.search(r'project\(KnognBrowser\s+VERSION\s+([0-9]+\.[0-9]+\.[0-9]+)', cmake)
+          import os, re
+          text = Path('CMakeLists.txt').read_text(encoding='utf-8')
+          match = re.search(r'project\(KnognBrowser\s+VERSION\s+([0-9]+\.[0-9]+\.[0-9]+)', text)
           if not match:
-              raise SystemExit('Unable to resolve Knogn version from CMakeLists.txt')
-
-          version = match.group(1)
-          if os.environ.get('REF_TYPE') == 'tag':
-              expected = f'v{version}'
-              actual = os.environ.get('REF_NAME', '')
-              if actual != expected:
-                  raise SystemExit(f'Release tag {actual!r} does not match application version {expected!r}')
-
-          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as env_file:
-              env_file.write(f'KNOGN_VERSION={version}\n')
-          print(f'Knogn version: {version}')
+              raise SystemExit('Could not read Qt compatibility version')
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as f:
+              f.write(f'KNOGN_VERSION={match.group(1)}\n')
           PY
 
-      - name: Install Qt
+      - name: Install Qt fallback dependencies
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.11.2'
@@ -74,13 +57,13 @@ jobs:
         shell: pwsh
         run: choco install nsis --no-progress -y
 
-      - name: Configure
+      - name: Configure Qt fallback
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
-      - name: Build
+      - name: Build Qt fallback
         run: cmake --build build --config Release --parallel 2
 
-      - name: Package Linux
+      - name: Package Linux fallback
         if: runner.os == 'Linux'
         shell: bash
         run: |
@@ -88,7 +71,7 @@ jobs:
           cpack --config build/CPackConfig.cmake -G DEB -B dist
           cpack --config build/CPackConfig.cmake -G TXZ -B dist
 
-      - name: Package Windows
+      - name: Package Windows fallback
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
@@ -96,121 +79,28 @@ jobs:
           cpack --config build/CPackConfig.cmake -G NSIS -B dist
           cpack --config build/CPackConfig.cmake -G ZIP -B dist
 
-      - name: Package macOS
+      - name: Package macOS fallback with DMG retry
         if: runner.os == 'macOS'
         shell: bash
         run: |
+          set -euo pipefail
           mkdir -p dist
-          cpack --config build/CPackConfig.cmake -G DragNDrop -B dist
+          for attempt in 1 2 3; do
+            if cpack --config build/CPackConfig.cmake -G DragNDrop -B dist; then
+              break
+            fi
+            if [[ "$attempt" == 3 ]]; then
+              echo "DMG generation failed after $attempt attempts" >&2
+              exit 1
+            fi
+            echo "DMG generation attempt $attempt failed; detaching stale images and retrying"
+            hdiutil info | awk '/\/dev\// {print $1}' | sort -u | while read -r dev; do
+              hdiutil detach "$dev" -force >/dev/null 2>&1 || true
+            done
+            rm -rf dist/_CPack_Packages
+            sleep 3
+          done
           cpack --config build/CPackConfig.cmake -G ZIP -B dist
-
-      - name: Normalize versioned package names
-        shell: bash
-        env:
-          RUNNER_OS_NAME: ${{ runner.os }}
-          ARTIFACT_NAME: ${{ matrix.artifact }}
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import os
-
-          dist = Path('dist')
-          version = os.environ['KNOGN_VERSION']
-          os_name = os.environ['RUNNER_OS_NAME']
-
-          def one(pattern):
-              matches = [p for p in dist.glob(pattern) if p.is_file()]
-              if len(matches) != 1:
-                  raise SystemExit(f'Expected one {pattern} package, found {[p.name for p in matches]}')
-              return matches[0]
-
-          if os_name == 'Windows':
-              renames = {
-                  one('*.exe'): f'Knogn-{version}-windows-x86_64.exe',
-                  one('*.zip'): f'Knogn-{version}-windows-x86_64-portable.zip',
-              }
-          elif os_name == 'macOS':
-              renames = {
-                  one('*.dmg'): f'Knogn-{version}-macos-arm64.dmg',
-                  one('*.zip'): f'Knogn-{version}-macos-arm64-portable.zip',
-              }
-          else:
-              renames = {
-                  one('*.deb'): f'Knogn-{version}-linux-x86_64.deb',
-                  one('*.tar.xz'): f'Knogn-{version}-linux-x86_64-portable.tar.xz',
-              }
-
-          for source, target_name in renames.items():
-              target = dist / target_name
-              source.rename(target)
-              print(f'{source.name} -> {target.name}')
-          PY
-
-      - name: Validate package contents and report sizes
-        shell: bash
-        env:
-          RUNNER_OS_NAME: ${{ runner.os }}
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import os
-          import tarfile
-          import zipfile
-
-          dist = Path('dist')
-          packages = sorted(p for p in dist.iterdir() if p.is_file())
-          if not packages:
-              raise SystemExit('No package files were generated')
-
-          for path in packages:
-              print(f'{path.name}: {path.stat().st_size / (1024 * 1024):.1f} MiB')
-
-          os_name = os.environ['RUNNER_OS_NAME']
-          if os_name == 'Linux':
-              archive = next(dist.glob('*-portable.tar.xz'))
-              with tarfile.open(archive, 'r:xz') as handle:
-                  names = handle.getnames()
-              required = ['bin/Knogn', 'QtWebEngineProcess', 'qtwebengine_resources.pak']
-          else:
-              archive = next(dist.glob('*-portable.zip'))
-              with zipfile.ZipFile(archive) as handle:
-                  names = handle.namelist()
-              if os_name == 'Windows':
-                  required = ['Knogn.exe', 'QtWebEngineProcess.exe', 'qtwebengine_resources.pak']
-              else:
-                  required = [
-                      'Knogn.app/Contents/MacOS/Knogn',
-                      'QtWebEngineProcess.app/Contents/MacOS/QtWebEngineProcess',
-                      'qtwebengine_resources.pak',
-                  ]
-
-          missing = [needle for needle in required if not any(needle in name for name in names)]
-          if missing:
-              raise SystemExit(f'Package is missing required runtime content: {missing}')
-          print(f'Validated {archive.name}: required Knogn and Qt WebEngine runtime content is present')
-          PY
-
-      - name: Generate SHA-256 checksums
-        shell: bash
-        env:
-          ARTIFACT_NAME: ${{ matrix.artifact }}
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import hashlib
-          import os
-
-          dist = Path('dist')
-          version = os.environ['KNOGN_VERSION']
-          platform = os.environ['ARTIFACT_NAME']
-          files = sorted(p for p in dist.iterdir() if p.is_file() and not p.name.startswith('SHA256SUMS-'))
-          lines = []
-          for path in files:
-              digest = hashlib.sha256(path.read_bytes()).hexdigest()
-              lines.append(f'{digest}  {path.name}')
-          output = dist / f'SHA256SUMS-Knogn-{version}-{platform}.txt'
-          output.write_text('\n'.join(lines) + '\n', encoding='utf-8')
-          PY
 
       - name: Remove CPack staging directory
         shell: bash
@@ -218,101 +108,28 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           import shutil
-
           staging = Path('dist/_CPack_Packages')
           if staging.exists():
               shutil.rmtree(staging)
           PY
 
-      - name: Upload installer artifacts
+      - name: Generate checksums
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          root = Path('dist')
+          files = sorted(p for p in root.iterdir() if p.is_file())
+          lines = [f"{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}" for p in files]
+          (root / 'SHA256SUMS.txt').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+          PY
+
+      - name: Upload Qt compatibility artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: knogn-${{ matrix.artifact }}
+          name: knogn-qt-${{ matrix.artifact }}
           path: dist/*
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 14
           compression-level: 0
-
-  release:
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
-    needs: package
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Resolve release identity
-        shell: bash
-        env:
-          REF_TYPE: ${{ github.ref_type }}
-          REF_NAME: ${{ github.ref_name }}
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import os
-          import re
-
-          cmake = Path('CMakeLists.txt').read_text(encoding='utf-8')
-          match = re.search(r'project\(KnognBrowser\s+VERSION\s+([0-9]+\.[0-9]+\.[0-9]+)', cmake)
-          if not match:
-              raise SystemExit('Unable to resolve Knogn version from CMakeLists.txt')
-
-          version = match.group(1)
-          tag = f'v{version}'
-          if os.environ.get('REF_TYPE') == 'tag' and os.environ.get('REF_NAME') != tag:
-              raise SystemExit(f'Release tag {os.environ.get("REF_NAME")!r} does not match application version {tag!r}')
-
-          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as env_file:
-              env_file.write(f'KNOGN_VERSION={version}\n')
-              env_file.write(f'KNOGN_TAG={tag}\n')
-          print(f'Release identity: Knogn {version} ({tag})')
-          PY
-
-      - uses: actions/download-artifact@v5
-        with:
-          pattern: knogn-*
-          path: release
-          merge-multiple: true
-
-      - name: Verify release asset matrix
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import os
-
-          version = os.environ['KNOGN_VERSION']
-          root = Path('release')
-          expected = [
-              f'Knogn-{version}-windows-x86_64.exe',
-              f'Knogn-{version}-windows-x86_64-portable.zip',
-              f'Knogn-{version}-linux-x86_64.deb',
-              f'Knogn-{version}-linux-x86_64-portable.tar.xz',
-              f'Knogn-{version}-macos-arm64.dmg',
-              f'Knogn-{version}-macos-arm64-portable.zip',
-              f'SHA256SUMS-Knogn-{version}-windows-x86_64.txt',
-              f'SHA256SUMS-Knogn-{version}-linux-x86_64.txt',
-              f'SHA256SUMS-Knogn-{version}-macos-arm64.txt',
-          ]
-          missing = [name for name in expected if not (root / name).is_file()]
-          if missing:
-              raise SystemExit(f'Release asset matrix is incomplete: {missing}')
-          print(f'Release {os.environ["KNOGN_TAG"]} contains all Windows, Linux, and macOS assets')
-          PY
-
-      - name: Publish new version release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          if gh release view "$KNOGN_TAG" >/dev/null 2>&1; then
-            echo "Release $KNOGN_TAG already exists; leaving the published version unchanged."
-            exit 0
-          fi
-
-          gh release create "$KNOGN_TAG" release/* \
-            --target "$GITHUB_SHA" \
-            --title "Knogn $KNOGN_VERSION" \
-            --generate-notes

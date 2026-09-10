@@ -1,0 +1,28 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Knogn Chromium runtime probe</title>
+<pre id="out">running…</pre>
+<script>
+(async () => {
+  const video = document.createElement('video');
+  const audio = document.createElement('audio');
+  const h264 = 'video/mp4; codecs="avc1.42E01E"';
+  const h264aac = 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"';
+  const aac = 'audio/mp4; codecs="mp4a.40.2"';
+  const result = {
+    userAgent: navigator.userAgent,
+    chromiumBrowserIdentity: /Chrome\//.test(navigator.userAgent) && !/QtWebEngine/i.test(navigator.userAgent),
+    h264: video.canPlayType(h264) || 'unsupported',
+    h264Aac: video.canPlayType(h264aac) || 'unsupported',
+    aac: audio.canPlayType(aac) || 'unsupported',
+    mse: !!window.MediaSource,
+    mseH264Aac: !!window.MediaSource && MediaSource.isTypeSupported(h264aac),
+    eme: typeof navigator.requestMediaKeySystemAccess === 'function',
+    credentialsApi: !!navigator.credentials,
+    fedcmSurface: typeof window.IdentityCredential !== 'undefined',
+    webauthn: typeof window.PublicKeyCredential !== 'undefined',
+    storageAccessApi: typeof document.requestStorageAccess === 'function',
+  };
+  document.getElementById('out').textContent = 'KNOGN_PROBE:' + JSON.stringify(result);
+})();
+</script>
