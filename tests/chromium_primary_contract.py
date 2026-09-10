@@ -1,4 +1,7 @@
 from pathlib import Path
+import subprocess
+import sys
+import tempfile
 
 root = Path(__file__).resolve().parents[1]
 engine = root / "engine/chromium"
@@ -8,6 +11,8 @@ bootstrap = (engine / "bootstrap.py").read_text(encoding="utf-8")
 overlay = (engine / "knogn_overlay.py").read_text(encoding="utf-8")
 probe = (engine / "probe_runtime.py").read_text(encoding="utf-8")
 probe_page = (engine / "runtime_probe.html").read_text(encoding="utf-8")
+preflight = engine / "preflight.py"
+workflow = (root / ".github/workflows/chromium-engine.yml").read_text(encoding="utf-8")
 builder = (root / "tools/build_knogn.py").read_text(encoding="utf-8")
 docs = (root / "docs/ENGINE_MIGRATION.md").read_text(encoding="utf-8")
 
@@ -27,11 +32,30 @@ checks = {
     "runtime identity page rejects Qt": "QtWebEngine" in probe_page and "chromiumBrowserIdentity" in probe_page,
     "runtime identity harness enforces result": 'result.get("chromiumBrowserIdentity")' in probe,
     "runtime media acceptance": "--require-media" in probe and "mseH264Aac" in probe_page and "h264Aac" in probe_page,
+    "dedicated runner preflight wired": preflight.exists() and "Preflight Chromium build host" in workflow and "preflight.py" in workflow,
     "migration gate documented": "Google" in docs and "Plex" in docs and "Qt" in docs,
 }
 
 failed = [name for name, ok in checks.items() if not ok]
 if failed:
     raise SystemExit("Chromium primary-backend contract failed: " + ", ".join(failed))
+
+with tempfile.TemporaryDirectory() as temp:
+    subprocess.run(
+        [
+            sys.executable,
+            str(preflight),
+            "--workspace",
+            temp,
+            "--min-disk-gib",
+            "0",
+            "--min-memory-gib",
+            "0",
+            "--skip-tools",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
 print(f"Chromium primary-backend contract passed: {len(checks)} checks")
