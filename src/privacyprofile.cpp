@@ -4,11 +4,41 @@
 #include "privacyinterceptor.h"
 
 #include <QTimer>
+#include <QUrl>
 #include <QWebEngineCookieStore>
 #include <QWebEngineExtensionInfo>
 #include <QWebEngineExtensionManager>
 #include <QWebEngineProfile>
 #include <QWebEngineSettings>
+
+namespace {
+
+bool isFederatedIdentityOrigin(const QUrl &origin) {
+    if (origin.scheme().compare(QStringLiteral("https"), Qt::CaseInsensitive) != 0) {
+        return false;
+    }
+
+    const QString host = origin.host().toLower();
+    static const QStringList identityHosts = {
+        QStringLiteral("accounts.google.com"),
+        QStringLiteral("accounts.youtube.com"),
+        QStringLiteral("login.microsoftonline.com"),
+        QStringLiteral("login.live.com"),
+        QStringLiteral("appleid.apple.com"),
+        QStringLiteral("idmsa.apple.com"),
+        QStringLiteral("github.com"),
+        QStringLiteral("www.facebook.com")
+    };
+
+    return identityHosts.contains(host);
+}
+
+bool isWebFirstParty(const QUrl &url) {
+    const QString scheme = url.scheme().toLower();
+    return scheme == QStringLiteral("https") || scheme == QStringLiteral("http");
+}
+
+}  // namespace
 
 PrivacyProfile::PrivacyProfile(bool privateMode, QObject *parent)
     : QObject(parent), privateMode_(privateMode) {
@@ -33,9 +63,25 @@ void PrivacyProfile::configureProfile() {
     profile_->setUrlRequestInterceptor(interceptor_);
 
     const bool blockThirdParty = AppSettings::blockThirdPartyState();
+    const bool allowFederatedIdentity = AppSettings::allowFederatedIdentityState();
     profile_->cookieStore()->setCookieFilter(
-        [blockThirdParty](const QWebEngineCookieStore::FilterRequest &request) {
-            return !blockThirdParty || !request.thirdParty;
+        [blockThirdParty, allowFederatedIdentity](
+            const QWebEngineCookieStore::FilterRequest &request) {
+            if (!blockThirdParty || !request.thirdParty) return true;
+
+            // Keep third-party tracking state blocked generally, but permit the
+            // identity provider's own state when a normal web page explicitly
+            // invokes a known federated-login service. Qt documents origin and
+            // firstPartyUrl as the intended inputs for narrow third-party
+            // cookie/storage allowlists. This exception also covers the related
+            // IndexedDB/DOM storage/service-worker gate controlled by the filter.
+            if (allowFederatedIdentity &&
+                isWebFirstParty(request.firstPartyUrl) &&
+                isFederatedIdentityOrigin(request.origin)) {
+                return true;
+            }
+
+            return false;
         });
 
     auto *settings = profile_->settings();
