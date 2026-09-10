@@ -31,6 +31,8 @@ jobs:
         run: python tests/daily_driver_contract.py
       - name: Federated identity compatibility contract
         run: python tests/identity_contract.py
+      - name: Chromium backend bootstrap contract
+        run: python tests/chromium_backend_contract.py
 
   build:
     strategy:
