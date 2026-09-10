@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Prepare an external Chromium workspace for the Knogn full-browser backend.
 
-This script intentionally does not vendor Chromium into knogn-browser. It creates
-an external checkout using Chromium's depot_tools workflow, checks out the
-version pinned in chromium_version.txt, installs build hooks, and generates a
-Knogn output directory from args.gn.example.
+Chromium is intentionally not vendored into knogn-browser. This tool uses the
+upstream depot_tools workflow, checks out the revision pinned in
+chromium_version.txt, synchronizes DEPS, runs Chromium hooks, and generates an
+out/Knogn directory from args.gn.example.
 
-By default the script prints its plan. Pass --execute to run the network- and
-storage-heavy checkout/build preparation commands.
+The default mode is a dry run so CI can validate the plan without downloading a
+large Chromium checkout. Pass --execute for the storage/network-heavy operation.
 """
 
 from __future__ import annotations
@@ -16,9 +16,7 @@ import argparse
 import os
 from pathlib import Path
 import platform
-import shutil
 import subprocess
-import sys
 
 HERE = Path(__file__).resolve().parent
 PIN_FILE = HERE / "chromium_version.txt"
@@ -26,12 +24,21 @@ ARGS_FILE = HERE / "args.gn.example"
 DEPOT_TOOLS_URL = "https://chromium.googlesource.com/chromium/tools/depot_tools.git"
 
 
+def executable_command(command: list[str]) -> list[str]:
+    """Wrap depot_tools batch commands correctly when invoked from Python."""
+    if platform.system() != "Windows":
+        return command
+    if command and command[0] in {"fetch", "gclient", "gn", "autoninja"}:
+        return ["cmd.exe", "/d", "/s", "/c", subprocess.list2cmdline(command)]
+    return command
+
+
 def run(command: list[str], cwd: Path | None, env: dict[str, str], execute: bool) -> None:
     printable = " ".join(command)
     where = f" (cwd={cwd})" if cwd else ""
     print(f"+ {printable}{where}")
     if execute:
-        subprocess.run(command, cwd=cwd, env=env, check=True)
+        subprocess.run(executable_command(command), cwd=cwd, env=env, check=True)
 
 
 def read_pin() -> str:
@@ -60,7 +67,7 @@ def main() -> int:
     parser.add_argument(
         "--execute",
         action="store_true",
-        help="run the checkout/sync/hooks/GN commands instead of only printing them",
+        help="run checkout/sync/hooks/GN commands instead of only printing them",
     )
     parser.add_argument(
         "--media-experiment",
@@ -81,15 +88,15 @@ def main() -> int:
     parser.add_argument(
         "--build",
         action="store_true",
-        help="build the Chromium browser target after generation",
+        help="build the full Chromium browser target after generation",
     )
     args = parser.parse_args()
 
     version = read_pin()
     workspace = args.workspace.expanduser().resolve()
     depot = workspace / "depot_tools"
-    src = workspace / "chromium" / "src"
-    checkout_root = src.parent
+    chromium_root = workspace / "chromium"
+    src = chromium_root / "src"
     out = src / "out" / "Knogn"
 
     print(f"Knogn Chromium pin: {version}")
@@ -98,10 +105,14 @@ def main() -> int:
     if args.media_experiment:
         print("MEDIA EXPERIMENT: proprietary codecs enabled in generated args; DO NOT DISTRIBUTE by default")
 
+    if args.execute:
+        workspace.mkdir(parents=True, exist_ok=True)
+
     env = os.environ.copy()
-    path_sep = os.pathsep
-    env["PATH"] = str(depot) + path_sep + env.get("PATH", "")
+    env["PATH"] = str(depot) + os.pathsep + env.get("PATH", "")
     if platform.system() == "Windows":
+        # Chromium's public Windows instructions use the locally installed
+        # Visual Studio toolchain when this is 0.
         env.setdefault("DEPOT_TOOLS_WIN_TOOLCHAIN", "0")
 
     if not depot.exists():
@@ -114,7 +125,6 @@ def main() -> int:
     if not src.exists():
         if args.skip_fetch:
             raise SystemExit(f"--skip-fetch supplied but {src} does not exist")
-        chromium_root = workspace / "chromium"
         if args.execute:
             chromium_root.mkdir(parents=True, exist_ok=True)
         run(
@@ -126,14 +136,24 @@ def main() -> int:
     else:
         print(f"+ Chromium checkout already exists at {src}")
 
-    # The stable Chrome/Chromium version is used as a detached revision pin. A
-    # full sync after checkout aligns DEPS-managed repositories to that revision.
+    # Align Chromium and every DEPS-managed repository to the explicit stable
+    # version pin before hooks or generated build files are run.
     run(["git", "fetch", "origin", "--tags", "--force"], cwd=src, env=env, execute=args.execute)
     run(["git", "checkout", "--detach", version], cwd=src, env=env, execute=args.execute)
-    run(["gclient", "sync", "-D", "--with_branch_heads", "--with_tags"], cwd=checkout_root, env=env, execute=args.execute)
+    run(
+        ["gclient", "sync", "-D", "--with_branch_heads", "--with_tags"],
+        cwd=chromium_root,
+        env=env,
+        execute=args.execute,
+    )
 
     if platform.system() == "Linux":
-        run(["./build/install-build-deps.sh", "--no-prompt"], cwd=src, env=env, execute=args.execute)
+        run(
+            ["./build/install-build-deps.sh", "--no-prompt"],
+            cwd=src,
+            env=env,
+            execute=args.execute,
+        )
 
     run(["gclient", "runhooks"], cwd=src, env=env, execute=args.execute)
 
@@ -153,7 +173,10 @@ def main() -> int:
             execute=args.execute,
         )
 
-    print("\nBootstrap plan complete." if not args.execute else "\nChromium workspace prepared.")
+    if not args.execute:
+        print("\nBootstrap dry run complete. Re-run with --execute to perform these steps.")
+    else:
+        print("\nChromium workspace prepared.")
     print("Public Knogn packages must keep the proprietary-codec experiment disabled until redistribution rights are resolved.")
     return 0
 
