@@ -7,6 +7,7 @@ args = (engine / "args.gn.example").read_text(encoding="utf-8")
 bootstrap = (engine / "bootstrap.py").read_text(encoding="utf-8")
 overlay = (engine / "knogn_overlay.py").read_text(encoding="utf-8")
 probe = (engine / "probe_runtime.py").read_text(encoding="utf-8")
+probe_page = (engine / "runtime_probe.html").read_text(encoding="utf-8")
 builder = (root / "tools/build_knogn.py").read_text(encoding="utf-8")
 docs = (root / "docs/ENGINE_MIGRATION.md").read_text(encoding="utf-8")
 
@@ -23,8 +24,9 @@ checks = {
     "metrics disabled at source": "FEATURE_DISABLED_BY_DEFAULT" in overlay and "MetricsReporting" in overlay,
     "Chromium is primary build path": "Chromium is the default backend" in builder,
     "Qt requires explicit fallback": 'add_parser("qt-fallback"' in builder,
-    "runtime identity probe rejects Qt": "QtWebEngine" in probe and "chromiumBrowserIdentity" in probe,
-    "runtime media acceptance": "--require-media" in probe and "mseH264Aac" in probe,
+    "runtime identity page rejects Qt": "QtWebEngine" in probe_page and "chromiumBrowserIdentity" in probe_page,
+    "runtime identity harness enforces result": 'result.get("chromiumBrowserIdentity")' in probe,
+    "runtime media acceptance": "--require-media" in probe and "mseH264Aac" in probe_page and "h264Aac" in probe_page,
     "migration gate documented": "Google" in docs and "Plex" in docs and "Qt" in docs,
 }
 
