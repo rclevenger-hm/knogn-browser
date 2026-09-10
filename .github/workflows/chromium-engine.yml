@@ -32,6 +32,9 @@ jobs:
         with:
           python-version: '3.13'
 
+      - name: Preflight Chromium build host
+        run: python engine/chromium/preflight.py --workspace "$HOME/knogn-chromium"
+
       - name: Validate Chromium backend contracts
         run: |
           python tests/chromium_backend_contract.py
