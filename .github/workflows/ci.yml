@@ -29,6 +29,8 @@ jobs:
         run: python tests/branding_contract.py
       - name: Daily-driver contract
         run: python tests/daily_driver_contract.py
+      - name: Federated identity compatibility contract
+        run: python tests/identity_contract.py
 
   build:
     strategy:

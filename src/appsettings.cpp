@@ -46,6 +46,10 @@ bool blockThirdPartyState() {
     return settings().value(QStringLiteral("privacy/blockThirdPartyState"), true).toBool();
 }
 
+bool allowFederatedIdentityState() {
+    return settings().value(QStringLiteral("privacy/allowFederatedIdentityState"), true).toBool();
+}
+
 bool sendDoNotTrack() {
     return settings().value(QStringLiteral("privacy/sendDnt"), true).toBool();
 }

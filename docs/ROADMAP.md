@@ -18,25 +18,52 @@
 - [x] Windows/Linux/macOS CI definition
 - [x] Windows/Linux/macOS installer and portable-package pipeline
 
-## Milestone 0.2 — prove the privacy claim
+## Milestone 0.2 — daily-driver foundations
 
-- [ ] startup network-leak integration harness using a local intercepting proxy
-- [ ] enumerate and classify every browser-owned startup request
-- [ ] test normal and private profiles independently
-- [x] build artifacts from all desktop CI packaging jobs
-- [ ] signed release artifacts and SBOM
-- [ ] dependency/security update policy for Qt/Chromium
-
-## Milestone 0.3 — daily-driver local services
-
-- [ ] bookmarks + import/export
+- [x] persistent Settings UI
+- [x] configurable search engines, home page and downloads
+- [x] bookmarks/favorites, toolbar and manager
+- [x] bookmark import from Chromium-family stores and standard bookmark HTML
+- [x] OS-keychain-backed saved login storage
+- [x] password CSV import, manual fill and optional autofill
+- [x] system VPN routing plus HTTP/SOCKS browser-specific tunnel settings
+- [x] Windows executable/installer icon and desktop shortcut integration
 - [ ] local history + retention/clear-on-exit controls
-- [ ] session restore
-- [ ] find/zoom/print/PDF
-- [ ] download manager
-- [ ] configurable search engines
-- [ ] per-site permissions and storage exceptions
-- [ ] tab sleeping UI and resource view
+- [ ] session restore / recently closed tabs
+- [ ] download history/manager
+- [ ] richer bookmark folders/editing
+
+## Milestone 0.2.1 — compatibility blockers
+
+- [x] keep third-party state blocked generally while allowing narrow known identity-provider state
+- [x] modern Windows application manifest for correct browser/OS identity reporting
+- [x] local `knogn://identity` diagnostics for Credentials API, FedCM surface, WebAuthn and Storage Access
+- [ ] successful representative Sign in with Google flow
+- [ ] successful Microsoft / Apple / GitHub OAuth flows
+- [ ] prove FedCM behavior on released builds
+- [ ] H.264/AAC direct playback in released packages
+- [ ] H.264/AAC Media Source Extensions playback
+- [ ] Widevine detection/integration through an approved distribution path
+- [ ] Plex direct-play and transcode compatibility tests
+
+## Milestone 0.3 — full Chromium browser backend
+
+Qt WebEngine remains the bootstrap backend while Knogn brings up a full Chromium browser target. The Chromium path is now the highest-priority engine work because both federated identity and mainstream media expose hard limits of an embedded WebEngine shell.
+
+- [x] adopt full-browser backend decision (ADR 0004)
+- [x] pin initial Chromium backend spike to an upstream stable version
+- [x] add baseline GN configuration and codec experiment notes
+- [ ] external Chromium checkout/bootstrap tooling
+- [ ] Knogn patch-overlay framework
+- [ ] remove/disable unwanted browser-owned Google services without breaking ordinary Google websites
+- [ ] Knogn branding/product resources in Chromium UI
+- [ ] privacy network-leak contract against the Chromium target
+- [ ] normal/private profile parity
+- [ ] extension compatibility parity
+- [ ] federated identity test suite
+- [ ] media capability/playback test suite
+- [ ] Windows/Linux/macOS packages from the Chromium backend
+- [ ] security-update/rebase automation tracking upstream stable
 
 ## Milestone 0.4 — privacy engine
 
@@ -48,6 +75,9 @@
 - [ ] DNS-over-HTTPS without a mandatory provider
 - [ ] proxy/SOCKS/Tor launch profiles
 - [ ] local-only privacy dashboard
+- [ ] startup network-leak integration harness using a local intercepting proxy
+- [ ] enumerate and classify every browser-owned startup request
+- [ ] signed release artifacts, SBOM and dependency policy
 
 ## Milestone 0.5 — extension breadth
 
@@ -60,8 +90,9 @@
 
 ## Later
 
-- password manager + OS keychain integration
+- automatic password-save detection
 - passkeys/WebAuthn UX
+- generated passwords
 - profiles/containers
 - reader mode
 - vertical tabs/tab groups
@@ -74,4 +105,4 @@
 
 ## Definition of faster
 
-Knogn will publish reproducible numbers rather than rely on perceived speed. Performance targets include startup latency, idle RSS, multi-tab RSS, page responsiveness, load CPU and battery impact. A speed optimization that weakens sandboxing or privacy policy is not an acceptable optimization.
+Knogn will publish reproducible numbers rather than rely on perceived speed. Performance targets include startup latency, idle RSS, multi-tab RSS, page responsiveness, load CPU, network throughput and battery impact. A speed optimization that weakens sandboxing, identity security or privacy policy is not an acceptable optimization.

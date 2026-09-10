@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 root = Path(__file__).resolve().parents[1]
 cmake = (root / "CMakeLists.txt").read_text()
@@ -10,7 +11,7 @@ flags = (root / "src" / "browserflags.cpp").read_text()
 privacy = (root / "src" / "privacyprofile.cpp").read_text()
 
 checks = {
-    "0.2.0 milestone version": "VERSION 0.2.0" in cmake,
+    "0.2 daily-driver version line": bool(re.search(r"VERSION 0\.2\.\d+", cmake)),
     "windows executable icon resource": "assets/knogn.ico" in cmake and "knogn.rc" in cmake,
     "windows installer icon": "CPACK_NSIS_MUI_ICON" in cmake,
     "windows installed app icon": "CPACK_NSIS_INSTALLED_ICON_NAME" in cmake,

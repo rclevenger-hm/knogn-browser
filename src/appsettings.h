@@ -12,6 +12,7 @@ bool askWhereToSaveDownloads();
 QString downloadDirectory();
 
 bool blockThirdPartyState();
+bool allowFederatedIdentityState();
 bool sendDoNotTrack();
 bool sendGlobalPrivacyControl();
 bool spellCheckEnabled();

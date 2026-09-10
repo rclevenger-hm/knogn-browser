@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(KnognBrowser VERSION 0.2.0 LANGUAGES CXX)
+project(KnognBrowser VERSION 0.2.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -46,6 +46,8 @@ qt_add_executable(knogn-browser
     src/browserwindow.h
     src/credentialstore.cpp
     src/credentialstore.h
+    src/identitydetails.cpp
+    src/identitydetails.h
     src/mediadetails.cpp
     src/mediadetails.h
     src/privacyinterceptor.cpp
@@ -79,6 +81,12 @@ endif()
 
 if(WIN32)
     set(KNOGN_ICON_PATH "${CMAKE_CURRENT_SOURCE_DIR}/assets/knogn.ico")
+    set(KNOGN_MANIFEST_PATH "${CMAKE_CURRENT_BINARY_DIR}/knogn.manifest")
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows/knogn.manifest.in"
+        "${KNOGN_MANIFEST_PATH}"
+        @ONLY
+    )
     configure_file(
         "${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows/knogn.rc.in"
         "${CMAKE_CURRENT_BINARY_DIR}/knogn.rc"

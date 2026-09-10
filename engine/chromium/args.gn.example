@@ -1,0 +1,32 @@
+# Knogn Chromium backend spike.
+#
+# This profile intentionally builds Chromium branding, not Google Chrome. It is
+# the baseline for removing browser-owned Google services before Knogn branding
+# and product patches are layered on top.
+
+is_debug = false
+is_official_build = true
+is_component_build = false
+symbol_level = 0
+blink_symbol_level = 0
+v8_symbol_level = 0
+
+is_chrome_branded = false
+use_official_google_api_keys = false
+
+# Baseline open-codec build. The media parity experiment uses the two settings
+# below instead, but release distribution must remain disabled until the codec
+# licensing path is explicitly approved:
+#
+# proprietary_codecs = true
+# ffmpeg_branding = "Chrome"
+#
+# Chromium's build files require non-Chromium FFmpeg branding whenever
+# proprietary_codecs is enabled.
+proprietary_codecs = false
+ffmpeg_branding = "Chromium"
+
+# Keep the browser target lean where possible without disabling web-platform
+# compatibility expected by normal sites.
+enable_nacl = false
+rtc_use_pipewire = true

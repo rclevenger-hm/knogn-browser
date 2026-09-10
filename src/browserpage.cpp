@@ -1,6 +1,7 @@
 #include "browserpage.h"
 
 #include "branding.h"
+#include "identitydetails.h"
 #include "mediadetails.h"
 
 #include <QMenuBar>
@@ -58,6 +59,14 @@ bool BrowserPage::acceptNavigationRequest(const QUrl &url,
         url.host() == QStringLiteral("media")) {
         QTimer::singleShot(0, this, [this] {
             setHtml(mediaDiagnosticsHtml(), QUrl(QStringLiteral("knogn://media")));
+        });
+        return false;
+    }
+
+    if (isMainFrame && url.scheme() == QStringLiteral("knogn") &&
+        url.host() == QStringLiteral("identity")) {
+        QTimer::singleShot(0, this, [this] {
+            setHtml(identityDiagnosticsHtml(), QUrl(QStringLiteral("knogn://identity")));
         });
         return false;
     }
