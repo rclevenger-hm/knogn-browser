@@ -11,7 +11,7 @@ checks = {
     "runtime green stylesheet": "Branding::applicationStyleSheet" in main,
     "approved forest palette": "#071711" in branding,
     "local branded new tab prepared": "A more mindful web" in branding and "Explore. Privately." in branding,
-    "pages landing page": "A more mindful web" in site and "No analytics. No trackers" in site,
+    "pages landing page": "A more mindful web" in site and "No cookies. No profiling. Privacy-first aggregate analytics." in site,
     "pages deployment workflow": "actions/deploy-pages@v4" in workflow,
 }
 
