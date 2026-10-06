@@ -23,7 +23,8 @@ For a local H.264/AAC parity experiment:
 
 ```bash
 python3 tools/build_knogn.py build --media-experiment
-python3 tools/build_knogn.py probe --require-media
+python3 tools/build_knogn.py media-fixtures --out test-results/media --include-proprietary
+python3 tools/build_knogn.py probe --out ~/knogn-chromium/chromium/src/out/KnognMedia --media-dir test-results/media --require-media --report test-results/runtime.json
 ```
 
 The media experiment is for local engineering validation only until redistribution rights for the enabled codecs are explicitly resolved.
@@ -69,7 +70,7 @@ The `Chrome` value here is Chromium's FFmpeg codec-branding selector; it does no
 
 ## Runtime acceptance
 
-`engine/chromium/probe_runtime.py` runs the built browser against a local, network-free probe page and fails if the browser still identifies as Qt WebEngine or lacks basic browser credential/WebAuthn surfaces. With `--require-media`, it additionally requires H.264/AAC and H.264/AAC MSE capability.
+`engine/chromium/probe_runtime.py` runs the built browser against a local, network-free probe page and fails if the browser still identifies as Qt WebEngine or lacks basic browser credential/WebAuthn surfaces. With `--require-media` and generated fixtures, it additionally requires completed H.264/AAC direct and MSE playback with decoded frames. The loopback probe verifies its build and fixture checksums and writes optional JSON evidence for both success and failure. See [Chromium validation](CHROMIUM_VALIDATION.md).
 
 The automated probe is necessary but not sufficient. Promotion of the Chromium backend requires manual/automated scenario coverage for:
 

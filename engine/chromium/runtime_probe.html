@@ -3,26 +3,88 @@
 <title>Knogn Chromium runtime probe</title>
 <pre id="out">running…</pre>
 <script>
+'use strict';
+const config = __KNOGN_CONFIG__;
+const video = document.createElement('video');
+const audio = document.createElement('audio');
+const h264 = 'video/mp4; codecs="avc1.42E01E"';
+const h264aac = 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"';
+const aac = 'audio/mp4; codecs="mp4a.40.2"';
+const result = {
+  schemaVersion: 1, complete: false, secureContext: isSecureContext,
+  userAgent: navigator.userAgent,
+  chromiumBrowserIdentity: /Chrome\//.test(navigator.userAgent) && !/QtWebEngine/i.test(navigator.userAgent),
+  h264: video.canPlayType(h264) || 'unsupported',
+  h264Aac: video.canPlayType(h264aac) || 'unsupported',
+  aac: audio.canPlayType(aac) || 'unsupported',
+  mse: !!window.MediaSource,
+  mseH264Aac: !!window.MediaSource && MediaSource.isTypeSupported(h264aac),
+  eme: typeof navigator.requestMediaKeySystemAccess === 'function',
+  credentialsApi: !!navigator.credentials,
+  fedcmSurface: typeof window.IdentityCredential !== 'undefined',
+  webauthn: typeof window.PublicKeyCredential !== 'undefined',
+  storageAccessApi: typeof document.requestStorageAccess === 'function',
+  playback: {},
+};
+
+async function playback(file, mse = false) {
+  const element = document.createElement('video');
+  element.muted = true;
+  element.playsInline = true;
+  document.body.append(element);
+  let timer, blobUrl;
+  try {
+    await new Promise((resolve, reject) => {
+      timer = setTimeout(() => reject(new Error('Playback timed out')), 15000);
+      element.addEventListener('ended', resolve, {once: true});
+      element.addEventListener('error', () => reject(new Error(`Media error ${element.error?.code}: ${element.error?.message}`)), {once: true});
+      async function start() {
+        if (mse) {
+          const source = new MediaSource();
+          blobUrl = URL.createObjectURL(source);
+          const opened = new Promise(resolve => source.addEventListener('sourceopen', resolve, {once: true}));
+          element.src = blobUrl;
+          await opened;
+          const buffer = source.addSourceBuffer(h264aac);
+          const response = await fetch(`media/${file}`);
+          if (!response.ok) throw new Error(`Fixture HTTP ${response.status}`);
+          const data = await response.arrayBuffer();
+          const appended = new Promise((resolve, reject) => {
+            buffer.addEventListener('updateend', resolve, {once: true});
+            buffer.addEventListener('error', () => reject(new Error('MSE append failed')), {once: true});
+          });
+          buffer.appendBuffer(data);
+          await appended;
+          source.endOfStream();
+        } else {
+          element.src = `media/${file}`;
+        }
+        await element.play();
+      }
+      start().catch(reject);
+    });
+    const quality = element.getVideoPlaybackQuality();
+    const decodedFrames = quality.totalVideoFrames - quality.droppedVideoFrames;
+    return {status: 'passed', ended: element.ended, currentTime: element.currentTime,
+            duration: element.duration, decodedFrames};
+  } catch (error) {
+    return {status: 'failed', error: String(error), ended: element.ended, currentTime: element.currentTime};
+  } finally {
+    clearTimeout(timer);
+    element.pause();
+    element.removeAttribute('src');
+    element.load();
+    element.remove();
+    if (blobUrl) URL.revokeObjectURL(blobUrl);
+  }
+}
+
 (async () => {
-  const video = document.createElement('video');
-  const audio = document.createElement('audio');
-  const h264 = 'video/mp4; codecs="avc1.42E01E"';
-  const h264aac = 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"';
-  const aac = 'audio/mp4; codecs="mp4a.40.2"';
-  const result = {
-    userAgent: navigator.userAgent,
-    chromiumBrowserIdentity: /Chrome\//.test(navigator.userAgent) && !/QtWebEngine/i.test(navigator.userAgent),
-    h264: video.canPlayType(h264) || 'unsupported',
-    h264Aac: video.canPlayType(h264aac) || 'unsupported',
-    aac: audio.canPlayType(aac) || 'unsupported',
-    mse: !!window.MediaSource,
-    mseH264Aac: !!window.MediaSource && MediaSource.isTypeSupported(h264aac),
-    eme: typeof navigator.requestMediaKeySystemAccess === 'function',
-    credentialsApi: !!navigator.credentials,
-    fedcmSurface: typeof window.IdentityCredential !== 'undefined',
-    webauthn: typeof window.PublicKeyCredential !== 'undefined',
-    storageAccessApi: typeof document.requestStorageAccess === 'function',
-  };
-  document.getElementById('out').textContent = 'KNOGN_PROBE:' + JSON.stringify(result);
-})();
+  if (config.files.includes('sample.webm')) result.playback.webmDirect = await playback('sample.webm');
+  if (config.files.includes('sample.mp4')) result.playback.h264Direct = await playback('sample.mp4');
+  if (config.files.includes('sample-fragmented.mp4')) result.playback.h264Mse = await playback('sample-fragmented.mp4', true);
+  result.complete = true;
+  document.getElementById('out').textContent = JSON.stringify(result, null, 2);
+  await fetch(config.resultUrl, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(result)});
+})().catch(error => { document.getElementById('out').textContent = String(error); });
 </script>

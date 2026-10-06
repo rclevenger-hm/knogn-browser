@@ -17,6 +17,11 @@ on:
 permissions:
   contents: read
 
+# All invocations share one persistent source tree; never mutate it concurrently.
+concurrency:
+  group: knogn-chromium-workspace
+  cancel-in-progress: false
+
 # Full Chromium source/build work is isolated from ordinary hosted PR runners.
 # A runner with this label needs substantial persistent disk/RAM/CPU and must not
 # execute untrusted workloads. The workspace is intentionally persistent so
@@ -32,6 +37,16 @@ jobs:
         with:
           python-version: '3.13'
 
+      - name: Select isolated output and evidence paths
+        shell: bash
+        run: |
+          output=Knogn
+          if [[ "${{ inputs.media_experiment }}" == "true" ]]; then
+            output=KnognMedia
+          fi
+          echo "KNOGN_OUT=$HOME/knogn-chromium/chromium/src/out/$output" >> "$GITHUB_ENV"
+          echo "KNOGN_EVIDENCE=$RUNNER_TEMP/knogn-evidence-${{ github.run_id }}-${{ github.run_attempt }}" >> "$GITHUB_ENV"
+
       - name: Preflight Chromium build host
         run: python engine/chromium/preflight.py --workspace "$HOME/knogn-chromium"
 
@@ -39,6 +54,7 @@ jobs:
         run: |
           python tests/chromium_backend_contract.py
           python tests/chromium_primary_contract.py
+          python -m unittest discover -s tests -p 'test_*.py' -v
 
       - name: Prepare and build Knogn Chromium
         shell: bash
@@ -58,25 +74,48 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          browser="$HOME/knogn-chromium/chromium/src/out/Knogn/chrome"
+          mkdir -p "$KNOGN_EVIDENCE"
+          cp "$KNOGN_OUT/knogn-build.json" "$KNOGN_EVIDENCE/build.json"
+          browser="$KNOGN_OUT/chrome"
           test -x "$browser"
           echo "Chromium pin: $(cat engine/chromium/chromium_version.txt)"
           "$browser" --version
 
-      - name: Probe browser identity and web-platform surfaces
+      - name: Generate local playback fixtures
+        if: ${{ inputs.build_browser }}
+        shell: bash
+        run: |
+          args=(--out "$KNOGN_EVIDENCE/media")
+          if [[ "${{ inputs.media_experiment }}" == "true" ]]; then
+            args+=(--include-proprietary)
+          fi
+          python engine/chromium/generate_media_fixtures.py "${args[@]}"
+
+      - name: Probe browser identity and actual media playback
         if: ${{ inputs.build_browser }}
         shell: bash
         run: |
           set -euo pipefail
-          args=(--out "$HOME/knogn-chromium/chromium/src/out/Knogn")
+          args=(--out "$KNOGN_OUT" --media-dir "$KNOGN_EVIDENCE/media" --report "$KNOGN_EVIDENCE/runtime.json")
           if [[ "${{ inputs.media_experiment }}" == "true" ]]; then
             args+=(--require-media)
           fi
           python engine/chromium/probe_runtime.py "${args[@]}"
+
+      - name: Keep build and runtime evidence only
+        if: ${{ always() && inputs.build_browser }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: chromium-evidence-${{ github.run_id }}
+          path: |
+            ${{ env.KNOGN_EVIDENCE }}/build.json
+            ${{ env.KNOGN_EVIDENCE }}/runtime.json
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Media experiment distribution guard
         if: ${{ inputs.media_experiment }}
         shell: bash
         run: |
           echo "The proprietary-codec engine experiment is build-and-test only."
-          echo "No package or artifact upload is permitted by this workflow."
+          echo "Only JSON evidence may be uploaded; no browser binary, CDM, package or media fixture is published."
