@@ -44,6 +44,7 @@ def browser_binary(out: Path) -> Path:
 
 
 def load_build(out: Path, binary: Path) -> dict:
+    out, binary = out.resolve(), binary.resolve()
     manifest = json.loads((out / "knogn-build.json").read_text(encoding="utf-8"))
     if manifest.get("schemaVersion") != 1 or manifest.get("status") != "built":
         raise ValueError("A completed build manifest is required; rebuild this output directory")
