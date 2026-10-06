@@ -61,8 +61,11 @@ Run the local H.264/AAC media-parity experiment:
 
 ```bash
 python3 tools/build_knogn.py build --media-experiment
-python3 tools/build_knogn.py probe --require-media
+python3 tools/build_knogn.py media-fixtures --out test-results/media --include-proprietary
+python3 tools/build_knogn.py probe --out ~/knogn-chromium/chromium/src/out/KnognMedia --media-dir test-results/media --require-media --report test-results/runtime.json
 ```
+
+Build preparation now preserves local source edits, separates baseline and experimental output, and records a checksummed build manifest. The media probe can exercise real VP9/Opus playback plus H.264/AAC direct and MSE playback. See [Chromium build and runtime validation](docs/CHROMIUM_VALIDATION.md) for host setup, generated fixtures, failure reports and evidence boundaries.
 
 The proprietary-codec experiment is **not approved for public redistribution** until codec redistribution rights are resolved.
 
@@ -156,7 +159,7 @@ Hosted CI validates privacy, source, performance, media, identity, branding and 
 
 A full Chromium source build runs through `.github/workflows/chromium-engine.yml` on dedicated self-hosted capacity with the `knogn-chromium` label. A persistent workspace is expected because Chromium source and object output are too large for normal ephemeral PR runners.
 
-The engine workflow can build either the public open-codec baseline or the local media experiment. Media-experiment output is never uploaded by that workflow.
+The engine workflow can build either the public open-codec baseline or the local media experiment. Only build/runtime JSON evidence is uploaded by that workflow; experimental browser binaries, CDMs and media fixtures are never uploaded. Hosted CI also tests the tooling on three platforms and exercises the playback harness with the runner's browser. These checks do not substitute for building and testing Knogn itself.
 
 ## Performance
 

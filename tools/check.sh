@@ -10,6 +10,7 @@ python3 tests/daily_driver_contract.py
 python3 tests/identity_contract.py
 python3 tests/chromium_backend_contract.py
 python3 tests/chromium_primary_contract.py
+python3 -m unittest discover -s tests -p 'test_*.py' -v
 
 # Validate the exact primary-engine bootstrap/overlay plan without downloading
 # Chromium. Use tools/build_knogn.py build for the real full-browser build.

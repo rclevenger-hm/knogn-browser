@@ -36,6 +36,48 @@ jobs:
       - name: Chromium primary-backend contract
         run: python tests/chromium_primary_contract.py
 
+  chromium-tooling-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Exercise overlay, build safety, evidence and loopback transport
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+
+  # This tests the harness against the runner's browser, not Knogn compatibility.
+  # The dedicated engine workflow must produce Knogn's own playback evidence.
+  chromium-playback-harness:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Install local fixture generator
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Generate synthetic video and audio fixtures
+        run: python tools/build_knogn.py media-fixtures --out test-results/media --include-proprietary
+      - name: Exercise direct and MSE playback with the sandbox enabled
+        run: |
+          browser="$(command -v google-chrome)"
+          python engine/chromium/probe_runtime.py --binary "$browser" \
+            --media-dir test-results/media --require-media --report test-results/harness.json
+      - name: Keep harness evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chromium-playback-harness
+          path: test-results/harness.json
+          if-no-files-found: warn
+          retention-days: 14
+
   # Qt is retained only as a compatibility fallback during the 0.3 migration.
   # Full Chromium builds run in chromium-engine.yml on dedicated self-hosted capacity.
   qt-fallback-build:

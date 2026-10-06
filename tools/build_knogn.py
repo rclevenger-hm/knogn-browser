@@ -33,6 +33,15 @@ def main() -> int:
     probe = sub.add_parser("probe", help="probe a built Chromium browser")
     probe.add_argument("--out", type=Path, default=Path.home() / "knogn-chromium/chromium/src/out/Knogn")
     probe.add_argument("--require-media", action="store_true")
+    probe.add_argument("--media-dir", type=Path)
+    probe.add_argument("--report", type=Path)
+
+    fixtures = sub.add_parser("media-fixtures", help="generate synthetic local playback samples with FFmpeg")
+    fixtures.add_argument("--out", type=Path, required=True)
+    fixtures.add_argument("--include-proprietary", action="store_true")
+
+    preflight = sub.add_parser("preflight", help="check host capacity before a Chromium download")
+    preflight.add_argument("--workspace", type=Path, default=Path.home() / "knogn-chromium")
 
     qt = sub.add_parser("qt-fallback", help="build the legacy Qt fallback shell")
     qt.add_argument("--build-dir", type=Path, default=ROOT / "build-qt")
@@ -45,14 +54,26 @@ def main() -> int:
             command.append("--media-experiment")
         if args.command == "build":
             command.append("--build")
-            if args.jobs:
+            if args.jobs is not None:
                 command += ["--jobs", str(args.jobs)]
+        return subprocess.call(command)
+
+    if args.command == "preflight":
+        return subprocess.call([sys.executable, str(ROOT / "engine/chromium/preflight.py"), "--workspace", str(args.workspace)])
+
+    if args.command == "media-fixtures":
+        command = [sys.executable, str(ROOT / "engine/chromium/generate_media_fixtures.py"), "--out", str(args.out)]
+        if args.include_proprietary:
+            command.append("--include-proprietary")
         return subprocess.call(command)
 
     if args.command == "probe":
         command = [sys.executable, str(PROBE), "--out", str(args.out)]
         if args.require_media:
             command.append("--require-media")
+        for option in ("media_dir", "report"):
+            if getattr(args, option):
+                command += ["--" + option.replace("_", "-"), str(getattr(args, option))]
         return subprocess.call(command)
 
     build_dir = args.build_dir.resolve()

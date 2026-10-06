@@ -47,6 +47,10 @@ Chromium is now the primary development target. Qt WebEngine is an explicit fall
 - [x] Knogn source-overlay framework applied before GN generation
 - [x] runtime identity/media probe for built Chromium
 - [x] mark Qt builds as compatibility fallback in CI
+- [x] repeatable overlay restoration with local-edit protection
+- [x] automatic local build-host preflight and isolated codec-experiment output
+- [x] build/runtime JSON evidence bound to executable and fixture checksums
+- [x] behavioral tooling tests on three platforms and hosted playback-harness CI
 - [ ] successful dedicated full Chromium build from the pinned source
 - [ ] reproducible Windows Chromium build lane
 - [ ] reproducible macOS Chromium build lane
@@ -82,6 +86,7 @@ Browser-level Chrome Sync authentication is intentionally not a requirement. Kno
 - [x] compile Widevine key-system support hook without bundling a CDM
 - [x] local H.264/AAC proprietary-codec experiment configuration
 - [x] runtime H.264/AAC/MSE probe
+- [x] local synthetic VP9/Opus and H.264/AAC direct/MSE acceptance harness
 - [ ] H.264/AAC direct playback in full Chromium test build
 - [ ] H.264/AAC Media Source Extensions playback
 - [ ] Plex direct-play scenario
@@ -138,3 +143,7 @@ Browser-level Chrome Sync authentication is intentionally not a requirement. Kno
 ## Definition of faster
 
 Knogn will publish reproducible numbers rather than rely on perceived speed. Performance targets include startup latency, idle RSS, multi-tab RSS, page responsiveness, load CPU, network throughput and battery impact. A speed optimization that weakens sandboxing, identity security or privacy policy is not acceptable.
+
+## Current next step
+
+Run the dedicated engine workflow on a host that passes preflight, retain its build/runtime reports, and address failures before starting package promotion. [Validation instructions](CHROMIUM_VALIDATION.md) distinguish harness coverage from Knogn runtime evidence. Real provider login, Plex, Widevine, privacy-network and platform packaging acceptance remain open.

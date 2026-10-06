@@ -1,6 +1,6 @@
 # Knogn Chromium backend
 
-The Qt WebEngine implementation remains Knogn's bootstrap browser while this directory establishes the replacement engine path required for mainstream browser compatibility.
+Full Chromium is the primary development backend for Knogn 0.3.x. Qt WebEngine remains the explicit 0.2.x compatibility fallback while the new backend reaches release acceptance.
 
 ## Why this exists
 
@@ -60,4 +60,4 @@ The backend is not accepted merely because it builds. Before replacing Qt WebEng
 
 ## Migration target
 
-The Qt browser remains available while the Chromium backend is brought up. The backend becomes the primary Knogn desktop engine only after it passes the existing privacy/performance/media contracts plus real federated-login tests.
+The Qt browser remains available while the Chromium backend is brought up. Public Chromium releases require the existing privacy/performance/media contracts plus real federated-login tests. See [build and runtime validation](../../docs/CHROMIUM_VALIDATION.md) for repeatable preparation, isolated codec output, checksummed build reports and actual media playback tests.

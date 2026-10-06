@@ -12,9 +12,12 @@ performing a multi-gigabyte Chromium checkout. Use --execute for real work.
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
+import json
 import os
 from pathlib import Path
 import platform
+import re
 import subprocess
 import sys
 
@@ -43,7 +46,7 @@ def run(command: list[str], cwd: Path | None, env: dict[str, str], execute: bool
 
 def read_pin() -> str:
     version = PIN_FILE.read_text(encoding="utf-8").strip()
-    if not version or any(ch.isspace() for ch in version):
+    if not re.fullmatch(r"\d+\.\d+\.\d+\.\d+", version):
         raise SystemExit(f"Invalid Chromium pin in {PIN_FILE}")
     return version
 
@@ -54,6 +57,53 @@ def render_args(media_experiment: bool) -> str:
         text = text.replace("proprietary_codecs = false", "proprietary_codecs = true")
         text = text.replace('ffmpeg_branding = "Chromium"', 'ffmpeg_branding = "Chrome"')
     return text
+
+
+def output_directory(src: Path, media_experiment: bool) -> Path:
+    return src / "out" / ("KnognMedia" if media_experiment else "Knogn")
+
+
+def git_output(path: Path, *args: str) -> str:
+    return subprocess.check_output(["git", *args], cwd=path, text=True).strip()
+
+
+def require_clean_checkout(src: Path) -> None:
+    tracked = git_output(src, "status", "--porcelain", "--untracked-files=no")
+    if tracked:
+        raise SystemExit("Chromium checkout contains local edits; commit or preserve them before preparing:\n" + tracked)
+
+
+def positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("must be at least 1")
+    return parsed
+
+
+def record_build(src: Path, depot: Path, out: Path, version: str, args: argparse.Namespace) -> None:
+    from probe_runtime import browser_binary, sha256_file
+
+    overlay = src / ".knogn-overlay"
+    report = {
+        "schemaVersion": 1,
+        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "status": "built" if args.build else "prepared",
+        "chromiumVersion": version,
+        "chromiumCommit": git_output(src, "rev-parse", "HEAD"),
+        "depotToolsCommit": git_output(depot, "rev-parse", "HEAD"),
+        "knognCommit": git_output(HERE, "rev-parse", "HEAD"),
+        "knognDirty": bool(git_output(HERE, "status", "--porcelain")),
+        "platform": platform.system(),
+        "architecture": platform.machine(),
+        "mediaExperiment": args.media_experiment,
+        "publicRedistributionApproved": False,
+        "gnArgsSha256": sha256_file(out / "args.gn"),
+        "overlaySha256": sha256_file(overlay) if overlay.exists() and not args.skip_overlay else None,
+    }
+    if args.build:
+        binary = browser_binary(out)
+        report["browser"] = {"path": str(binary.relative_to(out)), "sha256": sha256_file(binary)}
+    (out / "knogn-build.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 
 
 def main() -> int:
@@ -86,7 +136,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--jobs",
-        type=int,
+        type=positive_int,
         default=max(2, (os.cpu_count() or 4) - 1),
         help="autoninja parallelism when --build is supplied",
     )
@@ -102,7 +152,7 @@ def main() -> int:
     depot = workspace / "depot_tools"
     chromium_root = workspace / "chromium"
     src = chromium_root / "src"
-    out = src / "out" / "Knogn"
+    out = output_directory(src, args.media_experiment)
 
     print(f"Knogn primary engine: Chromium {version}")
     print(f"Host: {platform.system()} {platform.machine()}")
@@ -111,6 +161,8 @@ def main() -> int:
         print("MEDIA EXPERIMENT: proprietary codecs enabled; local validation only, do not publish")
 
     if args.execute:
+        # Run for local entrypoints too, before starting downloads or changing a checkout.
+        subprocess.run([sys.executable, str(HERE / "preflight.py"), "--workspace", str(workspace)], check=True)
         workspace.mkdir(parents=True, exist_ok=True)
 
     env = os.environ.copy()
@@ -134,10 +186,16 @@ def main() -> int:
     else:
         print(f"+ Chromium checkout already exists at {src}")
 
-    run(["git", "fetch", "origin", "--tags", "--force"], cwd=src, env=env, execute=args.execute)
-    run(["git", "checkout", "--detach", version], cwd=src, env=env, execute=args.execute)
+    # Remove only our verified changes so the next pin can be checked out safely.
+    run([sys.executable, str(OVERLAY), str(src), "--restore"], cwd=src, env=env, execute=args.execute)
+    if args.execute:
+        require_clean_checkout(src)
+        # A failed preparation/build must never leave last run's success evidence.
+        (out / "knogn-build.json").unlink(missing_ok=True)
+    run(["git", "fetch", "--no-tags", "--depth=1", "origin", f"refs/tags/{version}"], cwd=src, env=env, execute=args.execute)
+    run(["git", "checkout", "--detach", "FETCH_HEAD"], cwd=src, env=env, execute=args.execute)
     run(
-        ["gclient", "sync", "-D", "--with_branch_heads", "--with_tags"],
+        ["gclient", "sync", "-D", "--nohooks", "--with_branch_heads", "--with_tags"],
         cwd=chromium_root,
         env=env,
         execute=args.execute,
@@ -170,6 +228,7 @@ def main() -> int:
         )
 
     if args.execute:
+        record_build(src, depot, out, version, args)
         print(f"\nKnogn Chromium backend prepared at {out}")
         if args.build:
             print("Full Chromium browser target built.")
